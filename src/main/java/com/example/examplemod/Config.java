@@ -1,42 +1,89 @@
 package com.example.examplemod;
 
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-// An example config class. This is not required, but it's a good idea to have one to keep your config organized.
-// Demonstrates how to use Neo's config APIs
 public class Config {
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    // Головний об'єкт конфігу
+    public static final ModConfigSpec SPEC;
 
-    public static final ModConfigSpec.BooleanValue LOG_DIRT_BLOCK = BUILDER
-            .comment("Whether to log the dirt block on common setup")
-            .define("logDirtBlock", true);
+    // ВИМИКАЧ ДЛЯ ШТУЧНОГО ІНТЕЛЕКТУ
+    public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_AI;
 
-    public static final ModConfigSpec.IntValue MAGIC_NUMBER = BUILDER
-            .comment("A magic number")
-            .defineInRange("magicNumber", 42, 0, Integer.MAX_VALUE);
+    // ЗМІННІ ДЛЯ РАДІУСІВ УСІХ МОБІВ
+    public static final ModConfigSpec.DoubleValue ZOMBIE_RADIUS;
+    public static final ModConfigSpec.DoubleValue HUSK_RADIUS;
+    public static final ModConfigSpec.DoubleValue DROWNED_RADIUS;
+    public static final ModConfigSpec.DoubleValue ZOMBIE_VILLAGER_RADIUS;
+    public static final ModConfigSpec.DoubleValue SKELETON_RADIUS;
+    public static final ModConfigSpec.DoubleValue STRAY_RADIUS;
+    public static final ModConfigSpec.DoubleValue WITHER_SKELETON_RADIUS;
+    public static final ModConfigSpec.DoubleValue SPIDER_RADIUS;
+    public static final ModConfigSpec.DoubleValue CAVE_SPIDER_RADIUS;
+    public static final ModConfigSpec.DoubleValue CREEPER_RADIUS;
+    public static final ModConfigSpec.DoubleValue ZOGLIN_RADIUS;
+    public static final ModConfigSpec.DoubleValue ZOMBIFIED_PIGLIN_RADIUS;
+    public static final ModConfigSpec.DoubleValue PILLAGER_RADIUS;
+    public static final ModConfigSpec.DoubleValue VINDICATOR_RADIUS;
+    public static final ModConfigSpec.DoubleValue EVOKER_RADIUS;
+    public static final ModConfigSpec.DoubleValue VEX_RADIUS;
+    public static final ModConfigSpec.DoubleValue RAVAGER_RADIUS;
+    public static final ModConfigSpec.DoubleValue PIGLIN_RADIUS;
+    public static final ModConfigSpec.DoubleValue PIGLIN_BRUTE_RADIUS;
+    public static final ModConfigSpec.DoubleValue IRON_GOLEM_RADIUS;
+    public static final ModConfigSpec.DoubleValue WITCH_RADIUS;
+    public static final ModConfigSpec.DoubleValue DEFAULT_RADIUS;
 
-    public static final ModConfigSpec.ConfigValue<String> MAGIC_NUMBER_INTRODUCTION = BUILDER
-            .comment("What you want the introduction message to be for the magic number")
-            .define("magicNumberIntroduction", "The magic number is... ");
 
-    // a list of strings that are treated as resource locations for items
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> ITEM_STRINGS = BUILDER
-            .comment("A list of items to log on common setup.")
-            .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), () -> "", Config::validateItemName);
+    static {
+        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
-    static final ModConfigSpec SPEC = BUILDER.build();
+        DEFAULT_RADIUS = builder
+                .comment("Default aggro radius for all monsters")
+                .defineInRange("defaultRadius", 20.0, 1.0, 256.0);
 
-    private static boolean validateItemName(final Object obj) {
-        return obj instanceof String itemName && BuiltInRegistries.ITEM.containsKey(ResourceLocation.parse(itemName));
+        builder.push("Global_AI_Settings");
+        ENABLE_CUSTOM_AI = builder
+                .comment("Увімкнути/Вимкнути кастомний штучний інтелект (війну фракцій)")
+                .define("enableCustomAI", true);
+        builder.pop();
+
+        builder.push("Mob_Aggro_Radiuses");
+        builder.comment("Налаштування радіусу (в блоках), на якому моби бачать ворогів");
+
+        // Монстри
+        ZOMBIE_RADIUS = builder.defineInRange("zombie", 30.0, 1.0, 128.0);
+        HUSK_RADIUS = builder.defineInRange("husk", 40.0, 1.0, 128.0);
+        DROWNED_RADIUS = builder.defineInRange("drowned", 25.0, 1.0, 128.0);
+        ZOMBIE_VILLAGER_RADIUS = builder.defineInRange("zombie_villager", 30.0, 1.0, 128.0);
+        SKELETON_RADIUS = builder.defineInRange("skeleton", 35.0, 1.0, 128.0);
+        STRAY_RADIUS = builder.defineInRange("stray", 35.0, 1.0, 128.0);
+        WITHER_SKELETON_RADIUS = builder.defineInRange("wither_skeleton", 30.0, 1.0, 128.0);
+        SPIDER_RADIUS = builder.defineInRange("spider", 24.0, 1.0, 128.0);
+        CAVE_SPIDER_RADIUS = builder.defineInRange("cave_spider", 16.0, 1.0, 128.0);
+        CREEPER_RADIUS = builder.defineInRange("creeper", 20.0, 1.0, 128.0);
+        ZOGLIN_RADIUS = builder.defineInRange("zoglin", 20.0, 1.0, 128.0);
+        ZOMBIFIED_PIGLIN_RADIUS = builder.defineInRange("zombified_piglin", 20.0, 1.0, 128.0);
+
+        // Розбійники
+        PILLAGER_RADIUS = builder.defineInRange("pillager", 45.0, 1.0, 128.0);
+        VINDICATOR_RADIUS = builder.defineInRange("vindicator", 20.0, 1.0, 128.0);
+        EVOKER_RADIUS = builder.defineInRange("evoker", 25.0, 1.0, 128.0);
+        VEX_RADIUS = builder.defineInRange("vex", 20.0, 1.0, 128.0);
+        RAVAGER_RADIUS = builder.defineInRange("ravager", 30.0, 1.0, 128.0);
+
+        // Пігліни
+        PIGLIN_RADIUS = builder.defineInRange("piglin", 25.0, 1.0, 128.0);
+        PIGLIN_BRUTE_RADIUS = builder.defineInRange("piglin_brute", 20.0, 1.0, 128.0);
+
+        // Інші
+        IRON_GOLEM_RADIUS = builder.defineInRange("iron_golem", 30.0, 1.0, 128.0);
+        WITCH_RADIUS = builder.defineInRange("witch", 25.0, 1.0, 128.0);
+
+
+        builder.pop();
+
+        SPEC = builder.build();
+
+
     }
 }
