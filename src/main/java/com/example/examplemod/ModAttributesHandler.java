@@ -29,7 +29,7 @@ public class ModAttributesHandler {
         event.add(EntityType.DROWNED, Attributes.FOLLOW_RANGE, 25.0);
         event.add(EntityType.ZOMBIE_VILLAGER, Attributes.FOLLOW_RANGE, 30.0);
 
-        event.add(EntityType.SKELETON, Attributes.FOLLOW_RANGE, 100.0);
+        event.add(EntityType.SKELETON, Attributes.FOLLOW_RANGE, 40.0);
         event.add(EntityType.STRAY, Attributes.FOLLOW_RANGE, 35.0);
         event.add(EntityType.WITHER_SKELETON, Attributes.FOLLOW_RANGE, 30.0);
 

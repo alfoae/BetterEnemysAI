@@ -3,78 +3,74 @@ package com.example.examplemod.util;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 
 public class AdvancedAimMath {
 
-    /**
-     * Універсальний метод для розрахунку ідеального пострілу.
-     * Його можна викликати з AI Goal будь-якого моба.
-     */
     public static AimResult calculateAim(Mob shooter, LivingEntity target, float baseProjectileSpeed) {
-        // 1. Отримуємо радіус з твого ModAttributesHandler
-        double maxAggroRadius = shooter.getAttributeValue(Attributes.FOLLOW_RANGE);
-
-        // 2. Радіус стрільби: 3/4 від агра, але не менше ванільних 16 блоків
-        double maxShootRange = Math.max(maxAggroRadius * 0.75, 16.0);
         double distance = shooter.distanceTo(target);
 
-        // Якщо ціль вийшла за межі ефективного радіуса пострілу
-        if (distance > maxShootRange) {
-            return null; // Повертаємо null (моб не повинен стріляти)
-        }
-
-        // 3. Динамічна швидкість снаряда
-        // Оскільки у стріл є опір повітря та гравітація, на великих дистанціях
-        // ванільної швидкості не вистачить. Додаємо компенсацію.
+        // 1. Динамічна швидкість снаряда
         float dynamicSpeed = baseProjectileSpeed;
         if (distance > 15.0) {
-            // Чим далі ціль, тим сильніший "поштовх" потрібен снаряду
-            dynamicSpeed = baseProjectileSpeed + (float) ((distance - 15.0) * 0.05);
+            dynamicSpeed = baseProjectileSpeed + (float) ((distance - 15.0) * 0.035);
         }
 
-        // 4. Стрільба на випередження (Predictive Aiming)
-        // Враховуємо вектор руху цілі
-        Vec3 targetVelocity = target.getDeltaMovement();
+        // ПОВЕРНУТО: Ванільний метод зчитування швидкості (який був раніше)
+        Vec3 targetVel = target.getDeltaMovement();
+        Vec3 flatTargetVel = new Vec3(targetVel.x, 0, targetVel.z);
 
-        // Час польоту t = відстань / швидкість
+        // 2. ФІКС ПРОМАХУ ПО БОКАХ:
+        // Збільшуємо час випередження на 30% (1.3), щоб скелет брав трохи далі наперед
+        // і стріла не пролітала в тебе за спиною.
         double flightTime = distance / dynamicSpeed;
+        double leadTime = flightTime * 1.3;
 
-        // Майбутня позиція: P_future = P_current + (V_target * t)
-        Vec3 predictedPos = target.position().add(targetVelocity.scale(flightTime));
-
-        // Цілимось у центр тіла (або голову), а не в стопи
+        // Майбутня позиція
+        Vec3 predictedPos = target.position().add(flatTargetVel.scale(leadTime));
         double targetY = predictedPos.y + (target.getEyeHeight() * 0.5);
 
-        // 5. Шанс похибки (Miss Chance)
-        // Формула: 0.5 * відстань (у відсотках). Наприклад: 50 блоків = 25% шансу.
-        float missChance = (float) (distance * 0.5) / 100.0f;
+        // 3. Шанс промаху
         RandomSource random = shooter.getRandom();
+        float missChance = (float) (distance * 0.5) / 100.0f;
         boolean willMiss = random.nextFloat() < missChance;
 
-        // 6. Розброс (Inaccuracy)
-        // Формула: 1 блок + 1 блок за кожні 25 блоків дистанції
-        float inaccuracy = 1.0f + (float) (distance / 25.0);
+        double offsetX = 0.0, offsetY = 0.0, offsetZ = 0.0;
 
+        // 4. Логіка штучного промаху по блоках
         if (willMiss) {
-            // Якщо математика сказала, що моб промахнеться — штучно ламаємо йому приціл
-            inaccuracy += 15.0f;
+            int blockSpread = 1 + (int) (distance / 25.0);
+
+            int shiftX = random.nextInt(blockSpread * 2 + 1) - blockSpread;
+            int shiftZ = random.nextInt(blockSpread * 2 + 1) - blockSpread;
+            int shiftY = random.nextInt(3) - 1;
+
+            if (shiftX == 0 && shiftZ == 0) {
+                shiftX = random.nextBoolean() ? 1 : -1;
+            }
+
+            double targetBlockX = Math.floor(predictedPos.x) + shiftX + 0.5;
+            double targetBlockZ = Math.floor(predictedPos.z) + shiftZ + 0.5;
+
+            offsetX = targetBlockX - predictedPos.x;
+            offsetZ = targetBlockZ - predictedPos.z;
+            offsetY = shiftY;
         }
 
-        // 7. Розрахунок підсумкового вектора пострілу (dX, dY, dZ)
+        predictedPos = predictedPos.add(offsetX, offsetY, offsetZ);
+        targetY += offsetY;
+
+        // ПОВЕРНУТО: Твоя ідеальна фізична гравітація (яку я випадково зламав минулого разу)
+        double gravityDrop = 0.5 * 0.05 * (flightTime * flightTime);
+
+        // 5. Фінальні вектори
         double dX = predictedPos.x - shooter.getX();
-        double dY = targetY - shooter.getEyeY();
+        double dY = targetY - shooter.getEyeY() + gravityDrop;
         double dZ = predictedPos.z - shooter.getZ();
 
-        // Повертаємо готовий результат
-        return new AimResult(dX, dY, dZ, dynamicSpeed, inaccuracy);
+        return new AimResult(dX, dY, dZ, dynamicSpeed, 0.0f);
     }
 
-    /**
-     * Допоміжний клас (Record), який зберігає результати обчислень.
-     * Замість Record можна використовувати звичайний public static class, якщо в тебе стара версія Java.
-     */
     public record AimResult(double dX, double dY, double dZ, float velocity, float inaccuracy) {
     }
 }
