@@ -16,19 +16,42 @@ public class AdvancedAimMath {
             dynamicSpeed = baseProjectileSpeed + (float) ((distance - 15.0) * 0.035);
         }
 
-        // ПОВЕРНУТО: Ванільний метод зчитування швидкості (який був раніше)
-        Vec3 targetVel = target.getDeltaMovement();
-        Vec3 flatTargetVel = new Vec3(targetVel.x, 0, targetVel.z);
+        Vec3 targetVel = target.position().subtract(target.xOld, target.yOld, target.zOld);
 
-        // 2. ФІКС ПРОМАХУ ПО БОКАХ:
-        // Збільшуємо час випередження на 30% (1.3), щоб скелет брав трохи далі наперед
-        // і стріла не пролітала в тебе за спиною.
+        // --- РЕАЛЬНА БАЛІСТИКА ---
+        double g = 0.05;
+
         double flightTime = distance / dynamicSpeed;
-        double leadTime = flightTime * 1.3;
 
-        // Майбутня позиція
-        Vec3 predictedPos = target.position().add(flatTargetVel.scale(leadTime));
-        double targetY = predictedPos.y + (target.getEyeHeight() * 0.5);
+        // ітераційне уточнення
+        for (int i = 0; i < 3; i++) {
+
+            Vec3 predictedPos = target.position().add(targetVel.scale(flightTime));
+
+            double dx = predictedPos.x - shooter.getX();
+            double dz = predictedPos.z - shooter.getZ();
+            double dy = target.getEyeY() - shooter.getEyeY();
+
+            double horizontalDist = Math.sqrt(dx * dx + dz * dz);
+
+            double speedSq = dynamicSpeed * dynamicSpeed;
+
+            double underRoot = speedSq * speedSq - g * (g * horizontalDist * horizontalDist + 2 * dy * speedSq);
+
+            if (underRoot < 0) {
+                break;
+            }
+
+            double angle = Math.atan((speedSq - Math.sqrt(underRoot)) / (g * horizontalDist));
+
+            double newTime = horizontalDist / (dynamicSpeed * Math.cos(angle));
+
+            flightTime = (flightTime + newTime) * 0.5;
+        }
+
+        // фінальна позиція
+        Vec3 predictedPos = target.position().add(targetVel.scale(flightTime));
+        double targetY = target.getEyeY();
 
         // 3. Шанс промаху
         RandomSource random = shooter.getRandom();
@@ -37,7 +60,7 @@ public class AdvancedAimMath {
 
         double offsetX = 0.0, offsetY = 0.0, offsetZ = 0.0;
 
-        // 4. Логіка штучного промаху по блоках
+        // 4. Логіка штучного промаху
         if (willMiss) {
             int blockSpread = 1 + (int) (distance / 25.0);
 
@@ -60,13 +83,13 @@ public class AdvancedAimMath {
         predictedPos = predictedPos.add(offsetX, offsetY, offsetZ);
         targetY += offsetY;
 
-        // ПОВЕРНУТО: Твоя ідеальна фізична гравітація (яку я випадково зламав минулого разу)
-        double gravityDrop = 0.5 * 0.05 * (flightTime * flightTime);
+        // компенсація гравітації
+        double gravityDrop = 0.5 * g * (flightTime * flightTime);
 
-        // 5. Фінальні вектори
+        // фінальні вектори (НЕ нормалізуємо!)
         double dX = predictedPos.x - shooter.getX();
-        double dY = targetY - shooter.getEyeY() + gravityDrop;
         double dZ = predictedPos.z - shooter.getZ();
+        double dY = targetY - shooter.getEyeY() + gravityDrop;
 
         return new AimResult(dX, dY, dZ, dynamicSpeed, 0.0f);
     }
