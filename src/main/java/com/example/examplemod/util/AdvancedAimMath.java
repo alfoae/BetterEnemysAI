@@ -50,6 +50,7 @@ public class AdvancedAimMath {
         }
 
         // фінальна позиція
+
         Vec3 predictedPos = target.position().add(targetVel.scale(flightTime));
         double targetY = target.getEyeY();
 
