@@ -12,7 +12,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
 
-public class Skeleton extends Goal {
+public class BetterSkeletonGoalAi extends Goal {
     private final AbstractSkeleton mob;
     private final double speedModifier;
     private final int attackIntervalMin;
@@ -25,8 +25,7 @@ public class Skeleton extends Goal {
     private Vec3 lastTargetPos = null;
 
 
-
-    public Skeleton(AbstractSkeleton mob, double speedModifier, int attackIntervalMin) {
+    public BetterSkeletonGoalAi(AbstractSkeleton mob, double speedModifier, int attackIntervalMin) {
         this.mob = mob;
         this.speedModifier = speedModifier;
         this.attackIntervalMin = attackIntervalMin;

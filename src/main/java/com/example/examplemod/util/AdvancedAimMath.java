@@ -97,6 +97,22 @@ public class AdvancedAimMath {
         return new AimResult(dX, dY, dZ, dynamicSpeed, 0.0f);
     }
 
+    public static Vec3 calculateLinearAim(Vec3 shooterPos, LivingEntity target, Vec3 targetVel, float projectileSpeed) {
+        double distance = shooterPos.distanceTo(target.getEyePosition());
+
+        // Скільки часу куля буде летіти до цілі
+        double flightTime = distance / projectileSpeed;
+
+        // Компенсація (як і у скелетів, візьмемо 0.75-0.8 для стабільності)
+        Vec3 adjustedVel = targetVel.scale(0.8);
+
+        // Передбачувана позиція
+        Vec3 predictedPos = target.getEyePosition().add(adjustedVel.scale(flightTime));
+
+        // Повертаємо вектор напрямку від Гаста до передбачуваної точки
+        return predictedPos.subtract(shooterPos).normalize();
+    }
+
     public record AimResult(double dX, double dY, double dZ, float velocity, float inaccuracy) {
     }
 }
