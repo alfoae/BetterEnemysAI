@@ -21,6 +21,10 @@ public class Skeleton extends Goal {
     private boolean strafingClockwise;
     private boolean strafingBackwards;
     private int strafingTime = -1;
+    private Vec3 targetVelocity = Vec3.ZERO;
+    private Vec3 lastTargetPos = null;
+
+
 
     public Skeleton(AbstractSkeleton mob, double speedModifier, int attackIntervalMin) {
         this.mob = mob;
@@ -33,6 +37,7 @@ public class Skeleton extends Goal {
     public boolean canUse() {
         return this.mob.getTarget() != null && this.isHoldingBow();
     }
+
 
     private boolean isHoldingBow() {
         return this.mob.isHolding(is -> is.getItem() instanceof BowItem);
@@ -61,7 +66,23 @@ public class Skeleton extends Goal {
     @Override
     public void tick() {
         LivingEntity target = this.mob.getTarget();
-        if (target == null) return;
+        if (target == null) {
+            this.lastTargetPos = null; // НОВЕ: Очищаємо, якщо ціль зникла
+            return;
+        }
+
+        // ========================================================
+        // НОВЕ: ЗГЛАДЖУВАННЯ ШВИДКОСТІ ЦІЛІ (Анти-розсинхрон)
+        // ========================================================
+        Vec3 currentPos = target.position();
+        if (this.lastTargetPos != null) {
+            Vec3 instantVel = currentPos.subtract(this.lastTargetPos);
+            // 0.4 означає: беремо 40% від поточної дельти і 60% від попередньої.
+            // Це ідеально згладжує мікро-зависання гравця.
+            this.targetVelocity = this.targetVelocity.lerp(instantVel, 0.4);
+        }
+        this.lastTargetPos = currentPos;
+        // ========================================================
 
         double distanceSq = this.mob.distanceToSqr(target.getX(), target.getY(), target.getZ());
         boolean canSee = this.mob.getSensing().hasLineOfSight(target);
@@ -108,7 +129,7 @@ public class Skeleton extends Goal {
         }
 
         // ========================================================
-        // ЛОГІКА СТРІЛЬБИ (Туди ми вставляємо нашу математику)
+        // ЛОГІКА СТРІЛЬБИ
         // ========================================================
         if (this.mob.isUsingItem()) {
             if (!canSee && this.seeTime < -60) {
@@ -120,12 +141,12 @@ public class Skeleton extends Goal {
 
                     // 1. ПЕРЕВІРКА НА ДРУЖНІЙ ВОГОНЬ ТА БЛОКИ
                     if (!isPathClear(this.mob, target)) {
-                        // Якщо шлях перекрито, скелет просто тримає лук натягнутим і чекає
                         return;
                     }
 
                     // 2. ВИКЛИК НАШОЇ МАТЕМАТИКИ
-                    AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f);
+                    // НОВЕ: Передаємо this.targetVelocity в метод!
+                    AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f, this.targetVelocity);
 
                     if (aim != null) {
                         shootCustomArrow(aim);

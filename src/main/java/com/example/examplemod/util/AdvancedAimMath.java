@@ -7,7 +7,7 @@ import net.minecraft.world.phys.Vec3;
 
 public class AdvancedAimMath {
 
-    public static AimResult calculateAim(Mob shooter, LivingEntity target, float baseProjectileSpeed) {
+    public static AimResult calculateAim(Mob shooter, LivingEntity target, float baseProjectileSpeed, Vec3 targetVel) {
         double distance = shooter.distanceTo(target);
 
         // 1. Динамічна швидкість снаряда
@@ -16,17 +16,19 @@ public class AdvancedAimMath {
             dynamicSpeed = baseProjectileSpeed + (float) ((distance - 15.0) * 0.035);
         }
 
-        Vec3 targetVel = target.position().subtract(target.xOld, target.yOld, target.zOld);
-
         // --- РЕАЛЬНА БАЛІСТИКА ---
         double g = 0.05;
 
         double flightTime = distance / dynamicSpeed;
 
+        // КОМПЕНСАЦІЯ: беремо 75% від швидкості гравця, щоб не стріляти занадто далеко вперед
+        Vec3 adjustedVel = targetVel.scale(0.75);
+
         // ітераційне уточнення
         for (int i = 0; i < 3; i++) {
 
-            Vec3 predictedPos = target.position().add(targetVel.scale(flightTime));
+            // Використовуємо adjustedVel замість targetVel
+            Vec3 predictedPos = target.position().add(adjustedVel.scale(flightTime));
 
             double dx = predictedPos.x - shooter.getX();
             double dz = predictedPos.z - shooter.getZ();
@@ -51,7 +53,7 @@ public class AdvancedAimMath {
 
         // фінальна позиція
 
-        Vec3 predictedPos = target.position().add(targetVel.scale(flightTime));
+        Vec3 predictedPos = target.position().add(adjustedVel.scale(flightTime));
         double targetY = target.getEyeY();
 
         // 3. Шанс промаху
