@@ -164,15 +164,30 @@ public class Skeleton extends Goal {
 
     // Метод для створення та запуску стріли з фіксом урону
     private void shootCustomArrow(AdvancedAimMath.AimResult aim) {
+        // 1. Отримуємо предмети в руках
         ItemStack bowStack = this.mob.getItemInHand(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof net.minecraft.world.item.BowItem));
         ItemStack ammoStack = this.mob.getProjectile(bowStack);
 
+        // 2. Використовуємо ПУБЛІЧНУ утиліту (це виправляє помилку "protected access")
+        // Вона сама викликає getArrow всередині Minecraft, де це дозволено
         AbstractArrow arrow = ProjectileUtil.getMobArrow(this.mob, ammoStack, 1.0f, bowStack);
 
+        // 3. РУЧНЕ НАКЛАДАННЯ ЕФЕКТІВ (якщо утиліта їх пропустила)
+        // Перевіряємо, чи це Зимогор (Stray)
+        if (this.mob instanceof net.minecraft.world.entity.monster.Stray && arrow instanceof net.minecraft.world.entity.projectile.Arrow tippedArrow) {
+            tippedArrow.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN, 600)); // Уповільнення на 30 сек
+        }
+
+        // Перевіряємо, чи це Болотяник (Bogged)
+        // Якщо твоя версія гри підтримує Bogged, ця перевірка спрацює:
+        if (this.mob.getType().toString().contains("bogged") && arrow instanceof net.minecraft.world.entity.projectile.Arrow tippedArrow) {
+            tippedArrow.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.POISON, 100)); // Отрута на 5 сек
+        }
+
+        // 4. Твоя математика шкоди та запуск
         double damageMultiplier = 3.0 / aim.velocity();
         arrow.setBaseDamage(arrow.getBaseDamage() * damageMultiplier);
 
-        // ЗВЕРНИ УВАГУ: Я прибрав distanceHoriz * 0.2D. Тепер ми передаємо просто aim.dY()
         arrow.shoot(aim.dX(), aim.dY(), aim.dZ(), aim.velocity(), aim.inaccuracy());
 
         this.mob.playSound(net.minecraft.sounds.SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (this.mob.getRandom().nextFloat() * 0.4F + 0.8F));
