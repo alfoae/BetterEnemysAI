@@ -98,18 +98,17 @@ public class AdvancedAimMath {
     }
 
     public static Vec3 calculateLinearAim(Vec3 shooterPos, LivingEntity target, Vec3 targetVel, float projectileSpeed) {
-        double distance = shooterPos.distanceTo(target.getEyePosition());
+        // БЕРЕМО ЦЕНТР ТІЛА (getY(0.5)), А НЕ ОЧІ
+        Vec3 targetCenterPos = new Vec3(target.getX(), target.getY(0.5), target.getZ());
 
-        // Скільки часу куля буде летіти до цілі
+        double distance = shooterPos.distanceTo(targetCenterPos);
+
         double flightTime = distance / projectileSpeed;
+        Vec3 adjustedVel = targetVel.scale(0.4); // Твій налаштований коефіцієнт
 
-        // Компенсація (як і у скелетів, візьмемо 0.75-0.8 для стабільності)
-        Vec3 adjustedVel = targetVel.scale(0.8);
+        // Передбачувана позиція центру тіла
+        Vec3 predictedPos = targetCenterPos.add(adjustedVel.scale(flightTime));
 
-        // Передбачувана позиція
-        Vec3 predictedPos = target.getEyePosition().add(adjustedVel.scale(flightTime));
-
-        // Повертаємо вектор напрямку від Гаста до передбачуваної точки
         return predictedPos.subtract(shooterPos).normalize();
     }
 
