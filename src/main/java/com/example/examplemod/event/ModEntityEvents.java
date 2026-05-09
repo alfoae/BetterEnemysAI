@@ -1,9 +1,11 @@
 package com.example.examplemod.event;
 
+import com.example.examplemod.mobAi.BetterBlazeGoalAi;
 import com.example.examplemod.mobAi.BetterGhastGoalAi;
 import com.example.examplemod.mobAi.BetterSkeletonGoalAi;
 import net.minecraft.world.entity.ai.goal.RangedBowAttackGoal;
 import net.minecraft.world.entity.monster.AbstractSkeleton;
+import net.minecraft.world.entity.monster.Blaze;
 import net.minecraft.world.entity.monster.Ghast;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -35,6 +37,17 @@ public class ModEntityEvents {
             );
             ghast.goalSelector.addGoal(2, new BetterGhastGoalAi(ghast));
             System.out.println("CUSTOM GHAST AI LOADED");
+        }
+
+        if (event.getEntity() instanceof Blaze blaze) {
+            // Видаляємо ванільну стрільбу
+            blaze.goalSelector.getAvailableGoals().removeIf(goal ->
+                    goal.getGoal().getClass().getName().contains("BlazeAttackGoal")
+            );
+
+            // Додаємо наш кулеметний AI
+            blaze.goalSelector.addGoal(4, new BetterBlazeGoalAi(blaze));
+            System.out.println("CUSTOM BLAZE AI LOADED");
         }
     }
 }
