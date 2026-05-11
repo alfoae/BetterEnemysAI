@@ -131,7 +131,8 @@ public class BetterSkeletonGoalAi extends Goal {
                     // 2. ВИКЛИК НАШОЇ МАТЕМАТИКИ
                     // НОВЕ: Передаємо  в метод!
                     Vec3 realVel = com.example.examplemod.util.PlayerVelocityTracker.getRealVelocity(target);
-                    AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f, realVel);
+
+                    AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f, realVel.scale(1.7));
 
                     if (aim != null) {
                         shootCustomArrow(aim);

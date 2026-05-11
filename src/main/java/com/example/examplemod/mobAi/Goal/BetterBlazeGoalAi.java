@@ -81,15 +81,15 @@ public class BetterBlazeGoalAi extends Goal {
     }
 
     private void shootFireball(LivingEntity target, int shotIndex) {
-        float projectileSpeed = 2.2f;
+        float projectileSpeed = 4f;
 
         // 1. БАЗОВА ТОЧКА: Рахуємо випередження в центр гравця
         Vec3 targetCenter = new Vec3(target.getX(), target.getY(0.5), target.getZ());
         double flightTime = this.blaze.position().distanceTo(targetCenter) / projectileSpeed;
 
-        // Коефіцієнт випередження 50%
+        // Коефіцієнт випередження
         Vec3 realVel = com.example.examplemod.util.PlayerVelocityTracker.getRealVelocity(target);
-        Vec3 adjustedVel = realVel.scale(1);
+        Vec3 adjustedVel = realVel.scale(2);
         Vec3 predictedPos = targetCenter.add(adjustedVel.scale(flightTime));
 
         // 2. ЛОГІКА ПРОМАХУ

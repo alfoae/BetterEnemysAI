@@ -5,8 +5,11 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "betterenemysai.refmap.json",
   "mixins": [
+    "BlazeMixin",
     "CrossbowAimMixin",
-    "PiglinAiMixin"
+    "GhastMixin",
+    "PiglinAiMixin",
+    "SkeletonMixin"
   ],
   "client": [],
   "injectors": {
