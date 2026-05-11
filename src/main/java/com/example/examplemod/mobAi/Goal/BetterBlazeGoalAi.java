@@ -1,4 +1,4 @@
-package com.example.examplemod.mobAi;
+package com.example.examplemod.mobAi.Goal;
 
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
@@ -12,8 +12,6 @@ import java.util.EnumSet;
 public class BetterBlazeGoalAi extends Goal {
     private final Blaze blaze;
     private int chargeTime;
-    private Vec3 targetVelocity = Vec3.ZERO;
-    private Vec3 lastTargetPos = null;
 
     public BetterBlazeGoalAi(Blaze blaze) {
         this.blaze = blaze;
@@ -35,7 +33,6 @@ public class BetterBlazeGoalAi extends Goal {
     @Override
     public void stop() {
         this.setBlazeCharged(false);
-        this.lastTargetPos = null;
     }
 
     @Override
@@ -43,19 +40,14 @@ public class BetterBlazeGoalAi extends Goal {
         LivingEntity target = this.blaze.getTarget();
         if (target == null) return;
 
-        // Згладжування швидкості для випередження
-        Vec3 currentPos = target.position();
-        if (this.lastTargetPos != null) {
-            Vec3 instantVel = currentPos.subtract(this.lastTargetPos);
-            this.targetVelocity = this.targetVelocity.lerp(instantVel, 0.4);
-        }
-        this.lastTargetPos = currentPos;
-
         double distanceSq = this.blaze.distanceToSqr(target);
         this.blaze.getLookControl().setLookAt(target, 10.0F, 10.0F);
 
-        // Якщо ціль в радіусі ~24 блоків і є лінія зору
-        if (distanceSq < 600.0D && this.blaze.hasLineOfSight(target)) {
+        double followRange = this.blaze.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
+
+        double maxShootDistance = followRange * 0.75;
+
+        if (distanceSq < (maxShootDistance * maxShootDistance) && this.blaze.hasLineOfSight(target)) {
             // Зупиняємось, щоб постріляти
             this.blaze.getNavigation().stop();
             this.chargeTime++;
@@ -96,7 +88,8 @@ public class BetterBlazeGoalAi extends Goal {
         double flightTime = this.blaze.position().distanceTo(targetCenter) / projectileSpeed;
 
         // Коефіцієнт випередження 50%
-        Vec3 adjustedVel = this.targetVelocity.scale(0.5);
+        Vec3 realVel = com.example.examplemod.util.PlayerVelocityTracker.getRealVelocity(target);
+        Vec3 adjustedVel = realVel.scale(1);
         Vec3 predictedPos = targetCenter.add(adjustedVel.scale(flightTime));
 
         // 2. ЛОГІКА ПРОМАХУ

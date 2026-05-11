@@ -1,4 +1,4 @@
-package com.example.examplemod.mobAi;
+package com.example.examplemod.mobAi.Goal;
 
 import com.example.examplemod.util.AdvancedAimMath;
 import net.minecraft.world.entity.LivingEntity;
@@ -21,8 +21,7 @@ public class BetterSkeletonGoalAi extends Goal {
     private boolean strafingClockwise;
     private boolean strafingBackwards;
     private int strafingTime = -1;
-    private Vec3 targetVelocity = Vec3.ZERO;
-    private Vec3 lastTargetPos = null;
+
 
 
     public BetterSkeletonGoalAi(AbstractSkeleton mob, double speedModifier, int attackIntervalMin) {
@@ -66,22 +65,8 @@ public class BetterSkeletonGoalAi extends Goal {
     public void tick() {
         LivingEntity target = this.mob.getTarget();
         if (target == null) {
-            this.lastTargetPos = null; // НОВЕ: Очищаємо, якщо ціль зникла
             return;
         }
-
-        // ========================================================
-        // НОВЕ: ЗГЛАДЖУВАННЯ ШВИДКОСТІ ЦІЛІ (Анти-розсинхрон)
-        // ========================================================
-        Vec3 currentPos = target.position();
-        if (this.lastTargetPos != null) {
-            Vec3 instantVel = currentPos.subtract(this.lastTargetPos);
-            // 0.4 означає: беремо 40% від поточної дельти і 60% від попередньої.
-            // Це ідеально згладжує мікро-зависання гравця.
-            this.targetVelocity = this.targetVelocity.lerp(instantVel, 0.4);
-        }
-        this.lastTargetPos = currentPos;
-        // ========================================================
 
         double distanceSq = this.mob.distanceToSqr(target.getX(), target.getY(), target.getZ());
         boolean canSee = this.mob.getSensing().hasLineOfSight(target);
@@ -144,8 +129,9 @@ public class BetterSkeletonGoalAi extends Goal {
                     }
 
                     // 2. ВИКЛИК НАШОЇ МАТЕМАТИКИ
-                    // НОВЕ: Передаємо this.targetVelocity в метод!
-                    AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f, this.targetVelocity);
+                    // НОВЕ: Передаємо  в метод!
+                    Vec3 realVel = com.example.examplemod.util.PlayerVelocityTracker.getRealVelocity(target);
+                    AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f, realVel);
 
                     if (aim != null) {
                         shootCustomArrow(aim);

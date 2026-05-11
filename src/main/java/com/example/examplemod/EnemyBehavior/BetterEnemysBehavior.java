@@ -1,5 +1,7 @@
-package com.example.examplemod;
+package com.example.examplemod.EnemyBehavior;
 
+import com.example.examplemod.BetterEnemysAI;
+import com.example.examplemod.Config;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
@@ -14,7 +16,7 @@ import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import java.util.function.Predicate;
 
 @EventBusSubscriber(modid = BetterEnemysAI.MODID)
-public class MobAIEventHandler {
+public class BetterEnemysBehavior {
 
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {

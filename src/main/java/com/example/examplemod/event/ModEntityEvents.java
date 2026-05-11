@@ -1,8 +1,8 @@
 package com.example.examplemod.event;
 
-import com.example.examplemod.mobAi.BetterBlazeGoalAi;
-import com.example.examplemod.mobAi.BetterGhastGoalAi;
-import com.example.examplemod.mobAi.BetterSkeletonGoalAi;
+import com.example.examplemod.mobAi.Goal.BetterBlazeGoalAi;
+import com.example.examplemod.mobAi.Goal.BetterGhastGoalAi;
+import com.example.examplemod.mobAi.Goal.BetterSkeletonGoalAi;
 import net.minecraft.world.entity.ai.goal.RangedBowAttackGoal;
 import net.minecraft.world.entity.monster.AbstractSkeleton;
 import net.minecraft.world.entity.monster.Blaze;

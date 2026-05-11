@@ -1,4 +1,4 @@
-package com.example.examplemod;
+package com.example.examplemod.EnemyBehavior;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -7,14 +7,14 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.entity.EntityAttributeModificationEvent;
 
 
-@Mod(ModAttributesHandler.MODID)
+@Mod(СhangeSearchRadius.MODID)
 
-public class ModAttributesHandler {
+public class СhangeSearchRadius {
 
 
     public static final String MODID = "betterenemysai"; // Має співпадати з mods.toml
 
-    public ModAttributesHandler(IEventBus modEventBus) {
+    public СhangeSearchRadius(IEventBus modEventBus) {
 
         modEventBus.addListener(this::modifyAttributes);
     }
@@ -52,7 +52,7 @@ public class ModAttributesHandler {
         // ==========================================
         // 3. ПІГЛІНИ
         // ==========================================
-        event.add(EntityType.PIGLIN, Attributes.FOLLOW_RANGE, 25.0);
+        event.add(EntityType.PIGLIN, Attributes.FOLLOW_RANGE, 50.0);
         event.add(EntityType.PIGLIN_BRUTE, Attributes.FOLLOW_RANGE, 20.0);
 
         // ==========================================
@@ -60,5 +60,12 @@ public class ModAttributesHandler {
         // ==========================================
         event.add(EntityType.IRON_GOLEM, Attributes.FOLLOW_RANGE, 30.0);
         event.add(EntityType.WITCH, Attributes.FOLLOW_RANGE, 25.0);
+
+        // ==========================================
+        // 4. НЕЗЕР
+        // ==========================================
+        event.add(EntityType.GHAST, Attributes.FOLLOW_RANGE, 70.0);
+        event.add(EntityType.BLAZE, Attributes.FOLLOW_RANGE, 70.0);
+
     }
 }

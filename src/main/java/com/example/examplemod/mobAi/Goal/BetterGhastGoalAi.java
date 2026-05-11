@@ -1,4 +1,4 @@
-package com.example.examplemod.mobAi;
+package com.example.examplemod.mobAi.Goal;
 
 import com.example.examplemod.util.AdvancedAimMath;
 import net.minecraft.world.entity.LivingEntity;
@@ -12,8 +12,6 @@ import java.util.EnumSet;
 public class BetterGhastGoalAi extends Goal {
     private final Ghast ghast;
     private int chargeTime;
-    private Vec3 targetVelocity = Vec3.ZERO;
-    private Vec3 lastTargetPos = null;
 
     public BetterGhastGoalAi(Ghast ghast) {
         this.ghast = ghast;
@@ -33,7 +31,6 @@ public class BetterGhastGoalAi extends Goal {
     @Override
     public void stop() {
         this.ghast.setCharging(false);
-        this.lastTargetPos = null;
     }
 
     @Override
@@ -41,20 +38,16 @@ public class BetterGhastGoalAi extends Goal {
         LivingEntity target = this.ghast.getTarget();
         if (target == null) return;
 
-        // Згладжування швидкості
-        Vec3 currentPos = target.position();
-        if (this.lastTargetPos != null) {
-            Vec3 instantVel = currentPos.subtract(this.lastTargetPos);
-            this.targetVelocity = this.targetVelocity.lerp(instantVel, 0.4);
-        }
-        this.lastTargetPos = currentPos;
-
         double distanceSq = this.ghast.distanceToSqr(target);
 
         // Гаст завжди дивиться на ціль
         this.ghast.getLookControl().setLookAt(target, 10.0F, 10.0F);
 
-        if (distanceSq < 4096.0D && this.ghast.hasLineOfSight(target)) {
+        double followRange = this.ghast.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
+
+        double maxShootDistance = followRange * 0.75;
+
+        if (distanceSq < (maxShootDistance * maxShootDistance) && this.ghast.hasLineOfSight(target)) {
             this.chargeTime++;
 
             // Закриваємо рота через 10 тіків (0.5 сек) після пострілу
@@ -73,10 +66,11 @@ public class BetterGhastGoalAi extends Goal {
 
                 // 3. Створюємо і запускаємо фаєрбол
                 Vec3 shooterOrigin = new Vec3(this.ghast.getX(), this.ghast.getY(0.5) + 0.5, this.ghast.getZ());
-                float fireballSpeed = 1.5f;
-                Vec3 dir = AdvancedAimMath.calculateLinearAim(shooterOrigin, target, this.targetVelocity, fireballSpeed);
+                float fireballSpeed = 3f;
+                Vec3 realVel = com.example.examplemod.util.PlayerVelocityTracker.getRealVelocity(target);
+                Vec3 dir = AdvancedAimMath.calculateLinearAim(shooterOrigin, target, realVel, fireballSpeed);
 
-                LargeFireball fireball = new LargeFireball(this.ghast.level(), this.ghast, dir, 1);
+                LargeFireball fireball = new LargeFireball(this.ghast.level(), this.ghast, dir, 2);
                 fireball.setPos(shooterOrigin.x + dir.x * 2.0, shooterOrigin.y + dir.y * 2.0, shooterOrigin.z + dir.z * 2.0);
                 fireball.setDeltaMovement(dir.scale(fireballSpeed));
 
