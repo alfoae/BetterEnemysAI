@@ -1,7 +1,7 @@
 package com.example.examplemod.mobAi.Mixin;
 
 import com.example.examplemod.EnemyBehavior.ConditionalBehavior;
-import com.example.examplemod.EnemyBehavior.SwapWeaponBehavior;
+import com.example.examplemod.EnemyBehavior.PiglinSwapWeaponBehavior;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.monster.piglin.Piglin;
@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Mixin(PiglinAi.class)
-public class PiglinAiMixin {
+public class PiglinMixin {
 
     @ModifyArg(
             method = "initFightActivity",
@@ -55,7 +55,7 @@ public class PiglinAiMixin {
         }
 
         // Додаємо твою нову логіку зміни зброї в загальний список завдань
-        tasks.add(new SwapWeaponBehavior());
+        tasks.add(new PiglinSwapWeaponBehavior());
 
         // Повертаємо новий змінений список назад у гру
         return ImmutableList.copyOf(tasks);

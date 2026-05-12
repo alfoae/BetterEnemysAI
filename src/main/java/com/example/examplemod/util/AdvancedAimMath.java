@@ -22,7 +22,7 @@ public class AdvancedAimMath {
         double flightTime = distance / dynamicSpeed;
 
         // КОМПЕНСАЦІЯ: беремо 75% від швидкості гравця, щоб не стріляти занадто далеко вперед
-        Vec3 adjustedVel = targetVel.scale(1);
+        Vec3 adjustedVel = targetVel.scale(0.8);
 
         // ітераційне уточнення
         for (int i = 0; i < 3; i++) {

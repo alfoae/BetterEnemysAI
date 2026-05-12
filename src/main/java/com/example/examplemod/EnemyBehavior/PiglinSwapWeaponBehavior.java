@@ -13,12 +13,12 @@ import net.minecraft.world.item.Items;
 
 import java.util.Map;
 
-public class SwapWeaponBehavior extends Behavior<Piglin> {
+public class PiglinSwapWeaponBehavior extends Behavior<Piglin> {
 
     // Дистанція, на якій Піглін ховає арбалет і дістає меч
     private static final float MELEE_DISTANCE = 5.0F;
 
-    public SwapWeaponBehavior() {
+    public PiglinSwapWeaponBehavior() {
         super(Map.of(MemoryModuleType.ATTACK_TARGET, MemoryStatus.VALUE_PRESENT));
     }
 

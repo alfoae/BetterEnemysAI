@@ -8,7 +8,8 @@
     "BlazeMixin",
     "CrossbowAimMixin",
     "GhastMixin",
-    "PiglinAiMixin",
+    "PiglinMixin",
+    "PillagerMixin",
     "SkeletonMixin"
   ],
   "client": [],
