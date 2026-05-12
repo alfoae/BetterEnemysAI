@@ -104,7 +104,7 @@ public class AdvancedAimMath {
         double distance = shooterPos.distanceTo(targetCenterPos);
 
         double flightTime = distance / projectileSpeed;
-        Vec3 adjustedVel = targetVel.scale(10); // Твій налаштований коефіцієнт
+        Vec3 adjustedVel = targetVel.scale(1.8); // Твій налаштований коефіцієнт
 
         // Передбачувана позиція центру тіла
         Vec3 predictedPos = targetCenterPos.add(adjustedVel.scale(flightTime));
