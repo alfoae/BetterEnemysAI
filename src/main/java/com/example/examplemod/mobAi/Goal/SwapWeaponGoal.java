@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Goal;
 
+import com.example.examplemod.utils.IWeaponStorage;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -20,36 +21,41 @@ public class SwapWeaponGoal extends Goal {
     }
 
     @Override
-    public boolean canContinueToUse() {
-        // Завдання працює, тільки поки є ціль
-        return mob.getTarget() != null;
-    }
-
-    @Override
     public void tick() {
         LivingEntity target = mob.getTarget();
-
-        // ЗАХИСТ ВІД КРАШУ: Якщо ціль раптово зникла, припиняємо роботу
-        if (target == null) {
-            return;
-        }
+        if (target == null) return;
 
         double distSq = mob.distanceToSqr(target);
         boolean near = distSq <= 16.0;
 
-        if (near && !mob.getMainHandItem().is(Items.IRON_AXE)) {
-            mob.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_AXE));
-        } else if (!near && !mob.getMainHandItem().is(Items.CROSSBOW)) {
-            mob.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.CROSSBOW));
+        // Кастимо моба до нашого міксіна-сховища
+        IWeaponStorage storage = (IWeaponStorage) mob;
+        ItemStack current = mob.getMainHandItem();
+
+        if (near && !current.is(Items.IRON_AXE)) {
+            // Зберігаємо арбалет, дістаємо сокиру
+            storage.setStoredRanged(current.copy());
+            ItemStack next = storage.getStoredMelee();
+
+            ItemStack nextMelee = storage.getStoredMelee();
+            if (nextMelee.isEmpty()) nextMelee = new ItemStack(Items.IRON_AXE);
+
+            mob.setItemInHand(InteractionHand.MAIN_HAND, nextMelee);
+        } else if (!near && !current.is(Items.CROSSBOW)) {
+            // Зберігаємо сокиру, дістаємо арбалет
+            storage.setStoredMelee(current.copy());
+
+            ItemStack nextRanged = storage.getStoredRanged();
+            if (nextRanged.isEmpty()) nextRanged = new ItemStack(Items.CROSSBOW);
+
+            mob.setItemInHand(InteractionHand.MAIN_HAND, nextRanged);
         }
 
-        // Робимо його агресивним (піднімає зброю)
         mob.setAggressive(true);
     }
 
     @Override
     public void stop() {
-        // Коли гравець тікає і моб втрачає ціль — він заспокоюється і ховає зброю
         mob.setAggressive(false);
     }
 }

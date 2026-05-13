@@ -1,9 +1,9 @@
 package com.example.examplemod.EnemyBehavior;
 
+import com.example.examplemod.utils.IWeaponStorage;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.behavior.Behavior;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.ai.memory.MemoryStatus;
@@ -15,7 +15,6 @@ import java.util.Map;
 
 public class PiglinSwapWeaponBehavior extends Behavior<Piglin> {
 
-    // Дистанція, на якій Піглін ховає арбалет і дістає меч
     private static final float MELEE_DISTANCE = 5.0F;
 
     public PiglinSwapWeaponBehavior() {
@@ -42,28 +41,37 @@ public class PiglinSwapWeaponBehavior extends Behavior<Piglin> {
 
         if (target != null) {
             float distance = piglin.distanceTo(target);
+            IWeaponStorage storage = (IWeaponStorage) piglin;
+            ItemStack currentHand = piglin.getMainHandItem();
 
-            // Отримуємо його максимальний радіус зору (за замовчуванням 16)
-            double followRange = piglin.getAttributeValue(Attributes.FOLLOW_RANGE);
-
-            // Рахуємо 3/4 від цього радіусу (це його максимальна зона стрільби)
-            double maxShootDistance = followRange * 0.75;
-
+            // 1. Пріоритет - БЛИЖНІЙ БІЙ
             if (distance <= MELEE_DISTANCE) {
-                // Ми ближче ніж 5 блоків — беремо МЕЧ
-                if (!piglin.getMainHandItem().is(Items.GOLDEN_SWORD)) {
-                    piglin.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.GOLDEN_SWORD));
+                if (!currentHand.is(Items.GOLDEN_SWORD)) {
+                    // Зберігаємо арбалет
+                    if (currentHand.is(Items.CROSSBOW)) {
+                        storage.setStoredRanged(currentHand.copy());
+                    }
+
+                    // Дістаємо меч
+                    ItemStack storedMelee = storage.getStoredMelee();
+                    if (storedMelee.isEmpty()) storedMelee = new ItemStack(Items.GOLDEN_SWORD);
+
+                    piglin.setItemInHand(InteractionHand.MAIN_HAND, storedMelee);
                 }
-            } else if (distance <= maxShootDistance) {
-                // Ми в ідеальній зоні (від 5 блоків до 3/4 радіусу) — беремо АРБАЛЕТ
-                if (!piglin.getMainHandItem().is(Items.CROSSBOW)) {
-                    piglin.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.CROSSBOW));
-                }
-            } else {
-                // Якщо гравець ще далі (піглін тільки помітив його і біжить назустріч),
-                // теж тримаємо арбалет напоготові
-                if (!piglin.getMainHandItem().is(Items.CROSSBOW)) {
-                    piglin.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.CROSSBOW));
+            }
+            // 2. ДАЛЬНІЙ БІЙ (якщо дистанція більша за ближню)
+            else {
+                if (!currentHand.is(Items.CROSSBOW)) {
+                    // Зберігаємо меч
+                    if (currentHand.is(Items.GOLDEN_SWORD)) {
+                        storage.setStoredMelee(currentHand.copy());
+                    }
+
+                    // Дістаємо арбалет
+                    ItemStack storedRanged = storage.getStoredRanged();
+                    if (storedRanged.isEmpty()) storedRanged = new ItemStack(Items.CROSSBOW);
+
+                    piglin.setItemInHand(InteractionHand.MAIN_HAND, storedRanged);
                 }
             }
         }

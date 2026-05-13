@@ -45,16 +45,22 @@ public class CustomCrossbowShootGoal extends Goal {
         ItemStack crossbow = mob.getMainHandItem();
 
         if (state == 0) {
-            // КРОК 1: Починаємо зарядку
-            mob.startUsingItem(mob.getUsedItemHand());
-            // Вмикаємо агресію відразу, щоб міксін знав, що ми в бойовому стані
-            mob.setAggressive(true);
+            // ПЕРЕВІРКА: чи заряджений арбалет уже?
+            boolean isCharged = !crossbow.getOrDefault(net.minecraft.core.component.DataComponents.CHARGED_PROJECTILES,
+                    net.minecraft.world.item.component.ChargedProjectiles.EMPTY).isEmpty();
 
-            if (mob instanceof Pillager pillager) {
-                pillager.setChargingCrossbow(true);
+            if (isCharged) {
+                // Якщо вже заряджений — пропускаємо натягування, йдемо відразу до цілювання
+                this.state = 2;
+                this.attackTimer = 5; // Коротка пауза перед пострілом
+                mob.setAggressive(true);
+            } else {
+                // Якщо пустий — починаємо заряджати
+                mob.startUsingItem(mob.getUsedItemHand());
+                mob.setAggressive(true);
+                this.attackTimer = 15;
+                this.state = 1;
             }
-            this.attackTimer = 15;
-            this.state = 1;
         } else if (state == 1) {
             this.attackTimer--;
             if (this.attackTimer <= 0) {
@@ -68,22 +74,20 @@ public class CustomCrossbowShootGoal extends Goal {
             }
         } else if (state == 2) {
             this.attackTimer--;
-            // Поки таймер іде, моб просто стоїть у позі CROSSBOW_HOLD завдяки міксіну і агресії
             if (this.attackTimer <= 0) {
                 shootWithPrediction(target);
 
-                // ПІСЛЯ ПОСТРІЛУ: розряджаємо і знімаємо агресію
-                crossbow.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.EMPTY);
+                // Очищуємо арбалет
+                crossbow.set(net.minecraft.core.component.DataComponents.CHARGED_PROJECTILES,
+                        net.minecraft.world.item.component.ChargedProjectiles.EMPTY);
 
-                if (mob instanceof Pillager pillager) {
+                if (mob instanceof net.minecraft.world.entity.monster.Pillager pillager) {
                     pillager.setChargingCrossbow(false);
                 }
 
-                // Тільки тепер опускаємо руки
-                mob.setAggressive(false);
-
+                // ВАЖЛИВО: НЕ прибираємо setAggressive(true), щоб руки не схрещувалися
                 this.state = 0;
-                this.attackTimer = 5;
+                this.attackTimer = 5; // Кулдаун до наступної зарядки
             }
         }
     }
