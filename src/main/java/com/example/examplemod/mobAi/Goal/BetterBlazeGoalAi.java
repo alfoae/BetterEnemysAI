@@ -88,8 +88,8 @@ public class BetterBlazeGoalAi extends Goal {
         double flightTime = this.blaze.position().distanceTo(targetCenter) / projectileSpeed;
 
         // Коефіцієнт випередження
-        Vec3 realVel = com.example.examplemod.util.PlayerVelocityTracker.getRealVelocity(target);
-        Vec3 adjustedVel = realVel.scale(2);
+        Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
+        Vec3 adjustedVel = realVel.scale(2.2);
         Vec3 predictedPos = targetCenter.add(adjustedVel.scale(flightTime));
 
         // 2. ЛОГІКА ПРОМАХУ

@@ -1,6 +1,6 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.util.AdvancedAimMath;
+import com.example.examplemod.utils.AdvancedAimMath;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Ghast;
@@ -67,7 +67,7 @@ public class BetterGhastGoalAi extends Goal {
                 // 3. Створюємо і запускаємо фаєрбол
                 Vec3 shooterOrigin = new Vec3(this.ghast.getX(), this.ghast.getY(0.5) + 0.5, this.ghast.getZ());
                 float fireballSpeed = 3f;
-                Vec3 realVel = com.example.examplemod.util.PlayerVelocityTracker.getRealVelocity(target);
+                Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
                 Vec3 dir = AdvancedAimMath.calculateLinearAim(shooterOrigin, target, realVel, fireballSpeed);
 
                 LargeFireball fireball = new LargeFireball(this.ghast.level(), this.ghast, dir, 2);

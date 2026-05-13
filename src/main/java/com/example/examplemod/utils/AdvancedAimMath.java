@@ -1,4 +1,4 @@
-package com.example.examplemod.util;
+package com.example.examplemod.utils;
 
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
@@ -22,7 +22,7 @@ public class AdvancedAimMath {
         double flightTime = distance / dynamicSpeed;
 
         // КОМПЕНСАЦІЯ: беремо 75% від швидкості гравця, щоб не стріляти занадто далеко вперед
-        Vec3 adjustedVel = targetVel.scale(0.8);
+        Vec3 adjustedVel = targetVel.scale(1);
 
         // ітераційне уточнення
         for (int i = 0; i < 3; i++) {
@@ -104,7 +104,7 @@ public class AdvancedAimMath {
         double distance = shooterPos.distanceTo(targetCenterPos);
 
         double flightTime = distance / projectileSpeed;
-        Vec3 adjustedVel = targetVel.scale(1.8); // Твій налаштований коефіцієнт
+        Vec3 adjustedVel = targetVel.scale(1.7); // Твій налаштований коефіцієнт
 
         // Передбачувана позиція центру тіла
         Vec3 predictedPos = targetCenterPos.add(adjustedVel.scale(flightTime));

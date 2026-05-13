@@ -1,6 +1,6 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.util.AdvancedAimMath;
+import com.example.examplemod.utils.AdvancedAimMath;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.AbstractSkeleton;
@@ -130,7 +130,7 @@ public class BetterSkeletonGoalAi extends Goal {
 
                     // 2. ВИКЛИК НАШОЇ МАТЕМАТИКИ
                     // НОВЕ: Передаємо  в метод!
-                    Vec3 realVel = com.example.examplemod.util.PlayerVelocityTracker.getRealVelocity(target);
+                    Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
 
                     AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f, realVel.scale(1.8));
 

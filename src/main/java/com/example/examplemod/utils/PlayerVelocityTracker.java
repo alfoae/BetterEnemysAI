@@ -1,4 +1,4 @@
-package com.example.examplemod.util;
+package com.example.examplemod.utils;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;

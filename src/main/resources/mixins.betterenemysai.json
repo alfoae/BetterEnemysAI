@@ -6,11 +6,12 @@
   "refmap": "betterenemysai.refmap.json",
   "mixins": [
     "BlazeMixin",
-    "CrossbowAimMixin",
     "GhastMixin",
+    "PiglinCrossbowAimMixin",
     "PiglinMixin",
     "PillagerMixin",
-    "SkeletonMixin"
+    "SkeletonMixin",
+    "VindicatorMixin"
   ],
   "client": [],
   "injectors": {
