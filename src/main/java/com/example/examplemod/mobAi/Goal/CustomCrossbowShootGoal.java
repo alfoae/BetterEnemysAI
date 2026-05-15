@@ -87,7 +87,7 @@ public class CustomCrossbowShootGoal extends Goal {
 
                 // ВАЖЛИВО: НЕ прибираємо setAggressive(true), щоб руки не схрещувалися
                 this.state = 0;
-                this.attackTimer = 5; // Кулдаун до наступної зарядки
+                this.attackTimer = 10; // Кулдаун до наступної зарядки
             }
         }
     }

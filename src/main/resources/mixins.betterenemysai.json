@@ -7,6 +7,7 @@
   "mixins": [
     "BlazeMixin",
     "GhastMixin",
+    "MixinBreezeWindChargeShoot",
     "MobWeaponStorageMixin",
     "PiglinCrossbowAimMixin",
     "PiglinMixin",
