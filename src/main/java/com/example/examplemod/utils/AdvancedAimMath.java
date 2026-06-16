@@ -112,6 +112,42 @@ public class AdvancedAimMath {
         return predictedPos.subtract(shooterPos).normalize();
     }
 
+    public static AimResult calculateSwimmingAim(Mob shooter, LivingEntity target, float baseProjectileSpeed, Vec3 targetVel) {
+        double distance = shooter.distanceTo(target);
+
+        // 1. Динамічна швидкість снаряда (як у твоєму основному методі)
+        float dynamicSpeed = baseProjectileSpeed;
+        if (distance > 15.0) {
+            dynamicSpeed = baseProjectileSpeed + (float) ((distance - 15.0) * 0.035);
+        }
+
+        double g = 0.05;
+        double flightTime = distance / dynamicSpeed;
+
+        // Розрахунок ітерацій (точно як у тебе, але для ВСІХ осей X, Y, Z з центром тіла)
+        // Множник швидкості залишаємо 1, бо ти передаєш scale(1.8) з гоалу
+        Vec3 adjustedVel = targetVel.scale(1);
+
+        // Фіксуємо точку відліку на центрі тіла гравця (getY(0.5)), щоб хитбокс у 1 блок не ламав приціл
+        double targetY = target.getY(0.5);
+        Vec3 predictedPos = target.position();
+
+        for (int i = 0; i < 3; i++) {
+            predictedPos = target.position().add(adjustedVel.x * flightTime, 0.0, adjustedVel.z * flightTime);
+            targetY = target.getY(0.5) + (adjustedVel.y * flightTime);
+        }
+
+        // Компенсація гравітації тризубця
+        double gravityDrop = 0.5 * g * (flightTime * flightTime);
+
+        // Фінальні вектори
+        double dX = predictedPos.x - shooter.getX();
+        double dZ = predictedPos.z - shooter.getZ();
+        double dY = targetY - shooter.getEyeY() + gravityDrop;
+
+        return new AimResult(dX, dY, dZ, dynamicSpeed, 0.0f);
+    }
+
     public record AimResult(double dX, double dY, double dZ, float velocity, float inaccuracy) {
     }
 }
