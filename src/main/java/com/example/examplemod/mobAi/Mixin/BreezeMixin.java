@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 // 1. Ціль тепер - базовий клас усіх снарядів
 @Mixin(Projectile.class)
-public abstract class MixinBreezeWindChargeShoot {
+public abstract class BreezeMixin {
 
     // 2. Використовуємо точний дескриптор методу (DDDFF)V, щоб IntelliJ точно його знайшла
     @Inject(method = "shoot(DDDFF)V", at = @At("HEAD"), cancellable = true)

@@ -6,8 +6,8 @@
   "refmap": "betterenemysai.refmap.json",
   "mixins": [
     "BlazeMixin",
+    "BreezeMixin",
     "GhastMixin",
-    "MixinBreezeWindChargeShoot",
     "MobWeaponStorageMixin",
     "PiglinCrossbowAimMixin",
     "PiglinMixin",
