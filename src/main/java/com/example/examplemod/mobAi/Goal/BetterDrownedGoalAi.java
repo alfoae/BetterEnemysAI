@@ -13,7 +13,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
 
-public class BetterDrownedTridentGoalAi extends Goal {
+public class BetterDrownedGoalAi extends Goal {
     private final Drowned mob;
     private final double speedModifier;
     private final int attackIntervalMin;
@@ -23,7 +23,7 @@ public class BetterDrownedTridentGoalAi extends Goal {
     private boolean strafingBackwards;
     private int strafingTime = -1;
 
-    public BetterDrownedTridentGoalAi(Drowned mob, double speedModifier, int attackIntervalMin) {
+    public BetterDrownedGoalAi(Drowned mob, double speedModifier, int attackIntervalMin) {
         this.mob = mob;
         this.speedModifier = speedModifier;
         this.attackIntervalMin = attackIntervalMin;

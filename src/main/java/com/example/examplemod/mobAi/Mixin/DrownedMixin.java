@@ -1,6 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.mobAi.Goal.BetterDrownedTridentGoalAi;
+import com.example.examplemod.mobAi.Goal.BetterDrownedGoalAi;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.monster.Drowned;
@@ -26,7 +26,7 @@ public class DrownedMixin {
         // Пріоритет 2 (як у ванілі), швидкість 1.0D, інтервал між атаками — 40 тіків (2 секунди)
         drowned.goalSelector.addGoal(
                 2,
-                new BetterDrownedTridentGoalAi(drowned, 1.0D, 40)
+                new BetterDrownedGoalAi(drowned, 1.0D, 40)
         );
 
         // Дозволяємо абсолютно всім утопленикам підбирати речі з землі (в тому числі кинуті тризубці)

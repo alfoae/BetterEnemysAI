@@ -9,6 +9,7 @@
     "BreezeMixin",
     "DrownedMixin",
     "GhastMixin",
+    "LlamaMixin",
     "MobWeaponStorageMixin",
     "PiglinCrossbowAimMixin",
     "PiglinMixin",
