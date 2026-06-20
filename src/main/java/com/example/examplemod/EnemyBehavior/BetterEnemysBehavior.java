@@ -2,6 +2,7 @@ package com.example.examplemod.EnemyBehavior;
 
 import com.example.examplemod.BetterEnemysAI;
 import com.example.examplemod.Config;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
@@ -12,11 +13,78 @@ import net.minecraft.world.entity.npc.AbstractVillager;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 
 import java.util.function.Predicate;
 
 @EventBusSubscriber(modid = BetterEnemysAI.MODID)
 public class BetterEnemysBehavior {
+
+    /**
+     * Визначає фракцію сутності за тими ж правилами, що й onEntityJoinLevel нижче.
+     * Викликати з Goal/Mixin класів для перевірки "свій/чужий" перед стрільбою.
+     */
+    public static Faction getFaction(Entity entity) {
+        if (entity instanceof AbstractIllager || entity instanceof Ravager || entity instanceof Vex) {
+            return Faction.ILLAGER;
+        }
+        if (entity instanceof AbstractPiglin) {
+            return Faction.PIGLIN;
+        }
+        if (entity instanceof Witch) {
+            // Відьма ні з ким не дружить (її проти неї теж ніхто не б'є за правилами нижче,
+            // але вона сама не входить ні в одну фракцію), тож вважаємо її окремо.
+            return Faction.OTHER;
+        }
+        if (entity instanceof Monster) {
+            return Faction.MONSTER;
+        }
+        return Faction.OTHER;
+    }
+
+    /**
+     * Чи належать дві сутності до однієї (не OTHER) фракції.
+     * Гравці, голем, жителі (OTHER) НІКОЛИ не вважаються "своїми".
+     */
+    public static boolean isSameFaction(Entity a, Entity b) {
+        Faction fa = getFaction(a);
+        Faction fb = getFaction(b);
+        return fa != Faction.OTHER && fa == fb;
+    }
+
+    /**
+     * Якщо снаряд (чи будь-який інший урон) одного моба зачепив союзника по фракції,
+     * постраждалий НЕ переключає ціль на свого ж — урон лишається, агро не з'являється.
+     * Працює для всіх мобів одразу, без правок у кожному Goal/Mixin окремо.
+     */
+    @SubscribeEvent
+    public static void onLivingChangeTarget(LivingChangeTargetEvent event) {
+        if (!Config.ENABLE_CUSTOM_AI.get()) return;
+
+        // entity      — той, у кого зараз намагається змінитись ціль (наприклад зомбі, по якому випадково влучив скелет)
+        // newTarget   — на кого entity хоче переключитись (тут — скелет, союзник по фракції)
+        LivingEntity entity = event.getEntity();
+        LivingEntity newTarget = event.getNewAboutToBeSetTarget();
+        if (newTarget == null) return;
+
+        if (isSameFaction(entity, newTarget)) {
+            event.setCanceled(true); // забуваємо про "удар", не агримось на свого
+        }
+    }
+
+    // ========================================================
+    // НЕ АГРИТИСЬ НА СВОЇХ ПРИ ВИПАДКОВОМУ ПОПАДАННІ
+    // ========================================================
+
+    // ========================================================
+    // ФРАКЦІЇ
+    // ========================================================
+    public enum Faction {
+        MONSTER,   // зомбі, скелети, павуки, кріпери, зогліни, потоплені тощо
+        ILLAGER,   // розбійники, рейвагер, векс
+        PIGLIN,    // пігліни (звичайні й бруті, не зомбі-пігліни — ті MONSTER)
+        OTHER      // гравці, жителі, голем, тварини — нікому не "свої"
+    }
 
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {

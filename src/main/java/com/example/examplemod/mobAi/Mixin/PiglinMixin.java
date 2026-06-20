@@ -1,6 +1,7 @@
 package com.example.examplemod.mobAi.Mixin;
 
 import com.example.examplemod.EnemyBehavior.ConditionalBehavior;
+import com.example.examplemod.EnemyBehavior.PiglinCrossbowAttackBehavior;
 import com.example.examplemod.EnemyBehavior.PiglinSwapWeaponBehavior;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.world.entity.ai.behavior.BehaviorControl;
@@ -40,13 +41,11 @@ public class PiglinMixin {
                         task
                 ));
             }
-            // Знаходимо ванільну атаку з арбалета і обгортаємо її:
-            // Вона працюватиме ТІЛЬКИ тоді, коли в руках Арбалет
+            // Знаходимо ванільну атаку з арбалета і ПОВНІСТЮ ЗАМІНЮЄМО її власною —
+            // ванільну логіку ігноруємо (просто не додаємо `task` в новий список),
+            // натомість додаємо PiglinCrossbowAttackBehavior нижче (один раз, поза циклом).
             else if (taskName.contains("crossbow")) {
-                tasks.add(new ConditionalBehavior<>(
-                        piglin -> piglin.getMainHandItem().is(Items.CROSSBOW),
-                        task
-                ));
+                // нічого не додаємо тут — ванільна crossbow-задача викидається
             }
             // Усі інші завдання (переміщення, ухилення тощо) залишаємо без змін
             else {
@@ -56,6 +55,10 @@ public class PiglinMixin {
 
         // Додаємо твою нову логіку зміни зброї в загальний список завдань
         tasks.add(new PiglinSwapWeaponBehavior());
+
+        // Додаємо власну стрільбу з арбалета (тримає заряджене, чекає чисту лінію вогню,
+        // повністю замінює викинуту вище ванільну crossbow-задачу)
+        tasks.add(new PiglinCrossbowAttackBehavior());
 
         // Повертаємо новий змінений список назад у гру
         return ImmutableList.copyOf(tasks);

@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Goal;
 
+import com.example.examplemod.utils.ProjectileTrajectoryUtils;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -110,6 +111,12 @@ public class BetterBlazeGoalAi extends Goal {
         // 3. ПОСТРІЛ: Рахуємо траєкторію від центру Іфрита до (можливо зміщеної) точки
         Vec3 shooterOrigin = new Vec3(this.blaze.getX(), this.blaze.getY(0.5) + 0.5, this.blaze.getZ());
         Vec3 dir = predictedPos.subtract(shooterOrigin).normalize();
+
+        if (!ProjectileTrajectoryUtils.isPathClear(this.blaze, shooterOrigin, predictedPos, 0.4))  // перевірка траекторії
+        {
+            return;
+        }
+
 
         SmallFireball fireball = new SmallFireball(this.blaze.level(), this.blaze, dir);
 

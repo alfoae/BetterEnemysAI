@@ -48,6 +48,7 @@ public abstract class BreezeMixin {
                     // 2. Передаємо НОВУ швидкість у твою математику
                     Vec3 aimDir = AdvancedAimMath.calculateLinearAim(shooterPos, target, targetVel.scale(1.3), customSpeed);
 
+                    
                     // 3. Задаємо рух з НОВОЮ швидкістю
                     charge.setDeltaMovement(aimDir.scale(customSpeed));
 

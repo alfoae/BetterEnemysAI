@@ -75,7 +75,24 @@ public class CustomCrossbowShootGoal extends Goal {
         } else if (state == 2) {
             this.attackTimer--;
             if (this.attackTimer <= 0) {
-                shootWithPrediction(target);
+
+                Vec3 targetVel = PlayerVelocityTracker.getRealVelocity(target).scale(2);
+                var aim = AdvancedAimMath.calculateAim(mob, target, 4.0F, targetVel);
+
+                if (aim == null) {
+                    // Не вдалось розрахувати приціл — тримаємо заряджене, пробуємо ще раз наступний тік.
+                    this.attackTimer = 1;
+                    return;
+                }
+
+                if (!com.example.examplemod.utils.ProjectileTrajectoryUtils.isPathClear(mob, aim, 0.25)) {
+                    // Союзник на лінії вогню — арбалет ЗАЛИШАЄТЬСЯ заряджений (state не змінюємо,
+                    // CHARGED_PROJECTILES не чистимо), просто чекаємо і перевіряємо знову наступний тік.
+                    this.attackTimer = 1;
+                    return;
+                }
+
+                shootWithPrediction(target, aim);
 
                 // Очищуємо арбалет
                 crossbow.set(net.minecraft.core.component.DataComponents.CHARGED_PROJECTILES,
@@ -92,7 +109,7 @@ public class CustomCrossbowShootGoal extends Goal {
         }
     }
 
-    private void shootWithPrediction(LivingEntity target) {
+    private void shootWithPrediction(LivingEntity target, AdvancedAimMath.AimResult aim) {
         ItemStack crossbow = mob.getMainHandItem();
         float speed = 4.0F;
 
@@ -101,17 +118,12 @@ public class CustomCrossbowShootGoal extends Goal {
             arrow.setBaseDamage(1.3);
         }
 
-        Vec3 targetVel = PlayerVelocityTracker.getRealVelocity(target).scale(2);
-        var aim = AdvancedAimMath.calculateAim(mob, target, speed, targetVel);
+        double pX = mob.getX() + aim.dX();
+        double pZ = mob.getZ() + aim.dZ();
+        double vanillaAddedHeight = target.getBbHeight() * 0.3333333333333333D;
+        double pY = mob.getEyeY() + aim.dY() - vanillaAddedHeight;
 
-        if (aim != null) {
-            double pX = mob.getX() + aim.dX();
-            double pZ = mob.getZ() + aim.dZ();
-            double vanillaAddedHeight = target.getBbHeight() * 0.3333333333333333D;
-            double pY = mob.getEyeY() + aim.dY() - vanillaAddedHeight;
-
-            projectile.shoot(pX - mob.getX(), pY - mob.getEyeY(), pZ - mob.getZ(), speed, 1.0F);
-        }
+        projectile.shoot(pX - mob.getX(), pY - mob.getEyeY(), pZ - mob.getZ(), speed, 1.0F);
 
         mob.level().addFreshEntity(projectile);
     }

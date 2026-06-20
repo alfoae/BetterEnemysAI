@@ -1,6 +1,7 @@
 package com.example.examplemod.mobAi.Goal;
 
 import com.example.examplemod.utils.AdvancedAimMath;
+import com.example.examplemod.utils.ProjectileTrajectoryUtils;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.AbstractSkeleton;
@@ -123,11 +124,6 @@ public class BetterSkeletonGoalAi extends Goal {
                 // 20 тіків = 1 секунда (повний натяг лука)
                 if (useTime >= 20) {
 
-                    // 1. ПЕРЕВІРКА НА ДРУЖНІЙ ВОГОНЬ ТА БЛОКИ
-                    if (!isPathClear(this.mob, target)) {
-                        return;
-                    }
-
                     // 2. ВИКЛИК НАШОЇ МАТЕМАТИКИ
                     // НОВЕ: Передаємо  в метод!
                     Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
@@ -135,6 +131,10 @@ public class BetterSkeletonGoalAi extends Goal {
                     AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f, realVel.scale(1.8));
 
                     if (aim != null) {
+                        if (!ProjectileTrajectoryUtils.isPathClear(this.mob, aim, 0.25)) // перевірка траекторії
+                        {
+                            return;
+                        }
                         shootCustomArrow(aim);
                     }
 
@@ -178,22 +178,5 @@ public class BetterSkeletonGoalAi extends Goal {
 
         this.mob.playSound(net.minecraft.sounds.SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (this.mob.getRandom().nextFloat() * 0.4F + 0.8F));
         this.mob.level().addFreshEntity(arrow);
-    }
-
-    // Метод перевірки: чи є хтось або щось на лінії вогню
-    private boolean isPathClear(AbstractSkeleton shooter, LivingEntity target) {
-        Vec3 start = shooter.getEyePosition();
-        Vec3 end = target.getEyePosition();
-
-        // Перевіряємо ТІЛЬКИ чи немає на лінії вогню інших мобів (щоб не стріляти у спину зомбі)
-        net.minecraft.world.phys.AABB area = shooter.getBoundingBox().expandTowards(end.subtract(start)).inflate(1.0);
-        for (net.minecraft.world.entity.Entity entity : shooter.level().getEntities(shooter, area)) {
-            if (entity instanceof LivingEntity && entity != target && entity != shooter) {
-                if (entity.getBoundingBox().clip(start, end).isPresent()) {
-                    return false; // Попереду союзник, чекаємо!
-                }
-            }
-        }
-        return true; // Блоки більше не заважають стріляти на великі дистанції
     }
 }
