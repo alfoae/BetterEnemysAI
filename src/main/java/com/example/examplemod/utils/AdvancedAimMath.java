@@ -7,7 +7,16 @@ import net.minecraft.world.phys.Vec3;
 
 public class AdvancedAimMath {
 
-    public static AimResult calculateAim(Mob shooter, LivingEntity target, float baseProjectileSpeed, Vec3 targetVel) {
+    /**
+     * Точний приціл БЕЗ випадкової похибки промаху — детермінований (для одних і тих же
+     * shooter/target/швидкості/швидкості цілі результат завжди однаковий). Використовується
+     * для стабільної перевірки шляху щотіку очікування: перевіряти лінію вогню до того, як
+     * випадковий промах хоч раз кинутий, інакше кожен тік очікування генерував би НОВИЙ
+     * випадковий кидок willMiss, і зрештою якийсь випадковий варіант технічно "проходив"
+     * перевірку шляху, хоча реальний політ стріли (з ІНШИМ випадковим зсувом) міг зачепити
+     * союзника — бо то була вже зовсім інша, статистично незалежна спроба прицілу.
+     */
+    public static AimResult calculatePreciseAim(Mob shooter, LivingEntity target, float baseProjectileSpeed, Vec3 targetVel) {
         double distance = shooter.distanceTo(target);
 
         // 1. Динамічна швидкість снаряда
@@ -21,18 +30,19 @@ public class AdvancedAimMath {
 
         double flightTime = distance / dynamicSpeed;
 
-        // КОМПЕНСАЦІЯ: беремо 75% від швидкості гравця, щоб не стріляти занадто далеко вперед
         Vec3 adjustedVel = targetVel.scale(1);
 
         // ітераційне уточнення
         for (int i = 0; i < 3; i++) {
-
-            // Використовуємо adjustedVel замість targetVel
             Vec3 predictedPos = target.position().add(adjustedVel.scale(flightTime));
 
             double dx = predictedPos.x - shooter.getX();
             double dz = predictedPos.z - shooter.getZ();
-            double dy = target.getEyeY() - shooter.getEyeY();
+            // ВИПРАВЛЕНО: враховуємо передбачену вертикальну позицію цілі (стрибок/присідання
+            // в момент пострілу), а не лише ПОТОЧНУ target.getEyeY() — інакше й кут, і flightTime
+            // рахуються для застарілої висоти цілі.
+            double predictedEyeY = target.getEyeY() + adjustedVel.y * flightTime;
+            double dy = predictedEyeY - shooter.getEyeY();
 
             double horizontalDist = Math.sqrt(dx * dx + dz * dz);
 
@@ -51,50 +61,80 @@ public class AdvancedAimMath {
             flightTime = (flightTime + newTime) * 0.5;
         }
 
-        // фінальна позиція
-
         Vec3 predictedPos = target.position().add(adjustedVel.scale(flightTime));
-        double targetY = target.getEyeY();
+        double targetY = target.getEyeY() + adjustedVel.y * flightTime;
 
-        // 3. Шанс промаху
-        RandomSource random = shooter.getRandom();
-        float missChance = (float) (distance * 0.5) / 100.0f;
-        boolean willMiss = random.nextFloat() < missChance;
-
-        double offsetX = 0.0, offsetY = 0.0, offsetZ = 0.0;
-
-        // 4. Логіка штучного промаху
-        if (willMiss) {
-            int blockSpread = 1 + (int) (distance / 25.0);
-
-            int shiftX = random.nextInt(blockSpread * 2 + 1) - blockSpread;
-            int shiftZ = random.nextInt(blockSpread * 2 + 1) - blockSpread;
-            int shiftY = random.nextInt(3) - 1;
-
-            if (shiftX == 0 && shiftZ == 0) {
-                shiftX = random.nextBoolean() ? 1 : -1;
-            }
-
-            double targetBlockX = Math.floor(predictedPos.x) + shiftX + 0.5;
-            double targetBlockZ = Math.floor(predictedPos.z) + shiftZ + 0.5;
-
-            offsetX = targetBlockX - predictedPos.x;
-            offsetZ = targetBlockZ - predictedPos.z;
-            offsetY = shiftY;
-        }
-
-        predictedPos = predictedPos.add(offsetX, offsetY, offsetZ);
-        targetY += offsetY;
-
-        // компенсація гравітації
         double gravityDrop = 0.5 * g * (flightTime * flightTime);
 
-        // фінальні вектори (НЕ нормалізуємо!)
         double dX = predictedPos.x - shooter.getX();
         double dZ = predictedPos.z - shooter.getZ();
         double dY = targetY - shooter.getEyeY() + gravityDrop;
 
         return new AimResult(dX, dY, dZ, dynamicSpeed, 0.0f);
+    }
+
+    /**
+     * Повний приціл З випадковою похибкою промаху (willMiss), кинутою РІВНО ОДИН РАЗ
+     * усередині цього виклику. Викликати тільки в момент фактичного пострілу (не щотіку
+     * очікування!) — інакше похибка перекидається щоразу, і шлях, перевірений для одного
+     * випадкового варіанту, не гарантує безпеку для іншого, кинутого пізніше.
+     * <p>
+     * Це тонка обгортка над {@link #applyMissChance} для зворотної сумісності зі старими
+     * викликами. Для нового сценарію "перевірити шлях до похибки і перерахувати при потребі"
+     * використовуй {@link com.example.examplemod.utils.ProjectileTrajectoryUtils#resolveAimWithMissCheck}.
+     */
+    public static AimResult calculateAim(Mob shooter, LivingEntity target, float baseProjectileSpeed, Vec3 targetVel) {
+        AimResult precise = calculatePreciseAim(shooter, target, baseProjectileSpeed, targetVel);
+        return applyMissChance(shooter, target, precise);
+    }
+
+    /**
+     * Кидає шанс похибки промаху і, якщо спрацювало, додає випадковий зсув до вже готового
+     * точного прицілу {@code precise}. Кожен виклик — це НОВИЙ незалежний випадковий кидок
+     * (і нового willMiss, і нового зсуву, якщо він спрацював) — викликати повторно для
+     * перерахунку іншої похибки, якщо попередня виявилась заблокованою союзником.
+     *
+     * @return сам {@code precise} (той самий об'єкт, можна звірити через ==), якщо похибка
+     * не спрацювала; інакше новий AimResult зі зсувом.
+     */
+    public static AimResult applyMissChance(Mob shooter, LivingEntity target, AimResult precise) {
+        double distance = shooter.distanceTo(target);
+        RandomSource random = shooter.getRandom();
+        float missChance = (float) (distance * 0.5) / 100.0f;
+        boolean willMiss = random.nextFloat() < missChance;
+
+        if (!willMiss) {
+            return precise;
+        }
+
+        // predictedPos у світових координатах (precise.dX/dY/dZ — зсуви від shooter):
+        double predictedX = shooter.getX() + precise.dX();
+        double predictedZ = shooter.getZ() + precise.dZ();
+
+        int blockSpread = 1 + (int) (distance / 25.0);
+
+        int shiftX = random.nextInt(blockSpread * 2 + 1) - blockSpread;
+        int shiftZ = random.nextInt(blockSpread * 2 + 1) - blockSpread;
+        int shiftY = random.nextInt(3) - 1;
+
+        if (shiftX == 0 && shiftZ == 0) {
+            shiftX = random.nextBoolean() ? 1 : -1;
+        }
+
+        double targetBlockX = Math.floor(predictedX) + shiftX + 0.5;
+        double targetBlockZ = Math.floor(predictedZ) + shiftZ + 0.5;
+
+        double offsetX = targetBlockX - predictedX;
+        double offsetZ = targetBlockZ - predictedZ;
+        double offsetY = shiftY;
+
+        return new AimResult(
+                precise.dX() + offsetX,
+                precise.dY() + offsetY,
+                precise.dZ() + offsetZ,
+                precise.velocity(),
+                precise.inaccuracy()
+        );
     }
 
     public static Vec3 calculateLinearAim(Vec3 shooterPos, LivingEntity target, Vec3 targetVel, float projectileSpeed) {

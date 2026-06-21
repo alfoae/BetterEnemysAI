@@ -31,7 +31,10 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
 
     private static final double ARROW_RADIUS = 0.25;
 
-    private int state = 0; // 0 - спокій, 1 - натягування, 2 - заряджений (чекаємо чисту лінію)
+    private static final int CHARGE_TIME = 25;   // час натягу арбалета (як у ванільного гравця/пігліна)
+    private static final int COOLDOWN_TIME = 20; // пауза ПІСЛЯ пострілу, перш ніж натягувати знову
+
+    private int state = 0; // 0 - спокій, 1 - натягування, 2 - заряджений (чекаємо чисту лінію), 3 - кулдаун після пострілу
     private int attackTimer;
 
     public PiglinCrossbowAttackBehavior() {
@@ -78,7 +81,7 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
             } else {
                 piglin.startUsingItem(piglin.getUsedItemHand());
                 piglin.setAggressive(true);
-                this.attackTimer = 15;
+                this.attackTimer = CHARGE_TIME;
                 this.state = 1;
             }
         } else if (state == 1) {
@@ -105,7 +108,7 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
                     return;
                 }
 
-                if (!ProjectileTrajectoryUtils.isPathClear(piglin, aim, ARROW_RADIUS)) {
+                if (!ProjectileTrajectoryUtils.isPathClear(piglin, aim, 0.25)) {
                     // Союзник на лінії вогню — арбалет ЗАЛИШАЄТЬСЯ заряджений (state не змінюємо,
                     // CHARGED_PROJECTILES не чистимо), просто чекаємо ще тік і перевіряємо знову.
                     this.attackTimer = 1;
@@ -116,8 +119,17 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
 
                 crossbow.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.EMPTY);
 
-                this.state = 0;
-                this.attackTimer = 10; // кулдаун до наступної зарядки
+                // ВАЖЛИВО: переходимо в окремий стан "кулдаун", а не одразу в state=0 —
+                // інакше на наступному тіку state==0 побачить незаряджений арбалет і одразу
+                // почне новий натяг, повністю ігноруючи паузу після пострілу (саме це
+                // спричиняло "стрільбу як з кулемета").
+                this.state = 3;
+                this.attackTimer = COOLDOWN_TIME;
+            }
+        } else if (state == 3) {
+            this.attackTimer--;
+            if (this.attackTimer <= 0) {
+                this.state = 0; // тепер дозволяємо новий цикл натягу
             }
         }
     }

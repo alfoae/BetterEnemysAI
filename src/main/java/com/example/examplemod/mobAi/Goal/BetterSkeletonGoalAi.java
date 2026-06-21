@@ -124,23 +124,23 @@ public class BetterSkeletonGoalAi extends Goal {
                 // 20 тіків = 1 секунда (повний натяг лука)
                 if (useTime >= 20) {
 
-                    // 2. ВИКЛИК НАШОЇ МАТЕМАТИКИ
-                    // НОВЕ: Передаємо  в метод!
                     Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
 
-                    AdvancedAimMath.AimResult aim = AdvancedAimMath.calculateAim(this.mob, target, 3.0f, realVel.scale(1.8));
+                    // Уся логіка "точний приціл -> перевірка -> похибка -> перевірка -> ретраї"
+                    // інкапсульована тут. Якщо навіть ІДЕАЛЬНИЙ (без похибки) вистріл заблокований
+                    // союзником — повертає null, і похибка навіть не рахується.
+                    AdvancedAimMath.AimResult aim = ProjectileTrajectoryUtils.resolveAimWithMissCheck(
+                            this.mob, target, 3.0f, realVel.scale(1.8), 0.25
+                    );
 
                     if (aim != null) {
-                        if (!ProjectileTrajectoryUtils.isPathClear(this.mob, aim, 0.25)) // перевірка траекторії
-                        {
-                            return;
-                        }
                         shootCustomArrow(aim);
+                        // Скидаємо таймери ТІЛЬКИ після фактичного пострілу
+                        this.mob.stopUsingItem();
+                        this.attackTime = this.attackIntervalMin;
                     }
-
-                    // Скидаємо таймери після пострілу
-                    this.mob.stopUsingItem();
-                    this.attackTime = this.attackIntervalMin;
+                    // якщо aim == null — арбалет/лук ЛИШАЄТЬСЯ натягнутим (заряд тримається),
+                    // нічого не скидаємо, наступний тік перевірка повториться знову
                 }
             }
         } else if (--this.attackTime <= 0 && this.seeTime >= -60) {

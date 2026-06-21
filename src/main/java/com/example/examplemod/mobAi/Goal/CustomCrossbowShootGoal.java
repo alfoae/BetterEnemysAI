@@ -2,6 +2,7 @@ package com.example.examplemod.mobAi.Goal;
 
 import com.example.examplemod.utils.AdvancedAimMath;
 import com.example.examplemod.utils.PlayerVelocityTracker;
+import com.example.examplemod.utils.ProjectileTrajectoryUtils;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -85,7 +86,7 @@ public class CustomCrossbowShootGoal extends Goal {
                     return;
                 }
 
-                if (!com.example.examplemod.utils.ProjectileTrajectoryUtils.isPathClear(mob, aim, 0.25)) {
+                if (!ProjectileTrajectoryUtils.isPathClear(mob, aim, 0.25)) {
                     // Союзник на лінії вогню — арбалет ЗАЛИШАЄТЬСЯ заряджений (state не змінюємо,
                     // CHARGED_PROJECTILES не чистимо), просто чекаємо і перевіряємо знову наступний тік.
                     this.attackTimer = 1;
