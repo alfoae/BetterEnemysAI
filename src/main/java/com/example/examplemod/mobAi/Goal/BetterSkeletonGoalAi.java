@@ -129,11 +129,12 @@ public class BetterSkeletonGoalAi extends Goal {
                     // Уся логіка "точний приціл -> перевірка -> похибка -> перевірка -> ретраї"
                     // інкапсульована тут. Якщо навіть ІДЕАЛЬНИЙ (без похибки) вистріл заблокований
                     // союзником — повертає null, і похибка навіть не рахується.
-                    AdvancedAimMath.AimResult aim = ProjectileTrajectoryUtils.resolveAimWithMissCheck(
+                    AdvancedAimMath.AimResult aim = ProjectileTrajectoryUtils.resolveBallisticAimWithMissCheck(
                             this.mob, target, 3.0f, realVel.scale(1.8), 0.25
                     );
 
                     if (aim != null) {
+                        debugLogShot(target, aim, realVel);
                         shootCustomArrow(aim);
                         // Скидаємо таймери ТІЛЬКИ після фактичного пострілу
                         this.mob.stopUsingItem();
@@ -145,6 +146,61 @@ public class BetterSkeletonGoalAi extends Goal {
             }
         } else if (--this.attackTime <= 0 && this.seeTime >= -60) {
             this.mob.startUsingItem(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof BowItem));
+        }
+    }
+
+    /**
+     * ТИМЧАСОВИЙ DEBUG-ЛОГ: виводить у чат гравцю-цілі повні координати пострілу,
+     * чи був на шляху союзник (для точного і для фінального aim), і чи спрацювала похибка.
+     * Видалити після того, як баг знайдено.
+     */
+    private void debugLogShot(LivingEntity target, AdvancedAimMath.AimResult finalAim, Vec3 realVel) {
+        if (!(target instanceof net.minecraft.world.entity.player.Player player)) {
+            return;
+        }
+
+        Vec3 shooterPos = this.mob.position();
+        Vec3 startPos = this.mob.getEyePosition();
+        Vec3 targetPos = target.position();
+        Vec3 aimPoint = startPos.add(finalAim.dX(), finalAim.dY(), finalAim.dZ());
+
+        AdvancedAimMath.AimResult precise = AdvancedAimMath.calculatePreciseAim(this.mob, target, 3.0f, realVel.scale(1.8));
+        boolean wasMiss = Math.abs(precise.dX() - finalAim.dX()) > 1.0e-6
+                || Math.abs(precise.dY() - finalAim.dY()) > 1.0e-6
+                || Math.abs(precise.dZ() - finalAim.dZ()) > 1.0e-6;
+
+        Vec3 startForCheck = this.mob.getEyePosition();
+        boolean preciseBlocked = !ProjectileTrajectoryUtils.isPathClearBallistic(
+                this.mob, startForCheck, startForCheck.add(precise.dX(), precise.dY(), precise.dZ()), precise.velocity(), 0.28);
+        boolean finalBlocked = !ProjectileTrajectoryUtils.isPathClearBallistic(
+                this.mob, startForCheck, aimPoint, finalAim.velocity(), 0.28);
+
+        player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                String.format(java.util.Locale.US,
+                        "[DEBUG] Гравець(%.2f,%.2f,%.2f) Скелет(%.2f,%.2f,%.2f) Виліт(%.2f,%.2f,%.2f) "
+                                + "Ціль_польоту(%.2f,%.2f,%.2f) Похибка=%s БлокПряма=%s БлокФінал=%s",
+                        targetPos.x, targetPos.y, targetPos.z,
+                        shooterPos.x, shooterPos.y, shooterPos.z,
+                        startPos.x, startPos.y, startPos.z,
+                        aimPoint.x, aimPoint.y, aimPoint.z,
+                        wasMiss, preciseBlocked, finalBlocked
+                )
+        ));
+
+        // Додатковий лог: координати ВСІХ союзних мобів у радіусі 50 блоків від стрільця,
+        // щоб точно знати позицію того, хто потенційно заважає, замість гадання.
+        net.minecraft.world.phys.AABB searchBox = this.mob.getBoundingBox().inflate(50.0);
+        for (net.minecraft.world.entity.Entity e : this.mob.level().getEntities(this.mob, searchBox)) {
+            if (e instanceof LivingEntity living && com.example.examplemod.EnemyBehavior.BetterEnemysBehavior.isSameFaction(this.mob, living)) {
+                net.minecraft.world.phys.AABB box = living.getBoundingBox();
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        String.format(java.util.Locale.US,
+                                "[DEBUG] Союзник %s: box(minX=%.3f,maxX=%.3f,minY=%.3f,maxY=%.3f,minZ=%.3f,maxZ=%.3f)",
+                                living.getName().getString(),
+                                box.minX, box.maxX, box.minY, box.maxY, box.minZ, box.maxZ
+                        )
+                ));
+            }
         }
     }
 

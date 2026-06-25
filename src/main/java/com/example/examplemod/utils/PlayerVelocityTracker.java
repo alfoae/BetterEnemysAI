@@ -39,13 +39,27 @@ public class PlayerVelocityTracker {
         lastPositions.put(id, currentPos);
     }
 
+    // Мінімальний модуль швидкості, нижче якого вважаємо ціль НЕРУХОМОЮ. Без цього lerp-згасання
+    // (рядок нижче) залишає мікроскопічний "хвіст" швидкості ще ~10-15 тіків після того, як
+    // гравець фактично зупинився — і цей хвіст щотіку трохи інший, через що aimPoint у
+    // AdvancedAimMath теж "тремтить" і випадково проходить/не проходить перевірку шляху,
+    // хоча геометрично ціль уже стоїть на місці.
+    private static final double VELOCITY_DEADZONE = 0.005;
+
     // Головний метод, який будуть викликати твої моби!
     public static Vec3 getRealVelocity(LivingEntity target) {
+        Vec3 vel;
         if (target instanceof Player player) {
             // Якщо ціль - гравець, беремо нашу плавно пораховану швидкість
-            return realVelocities.getOrDefault(player.getUUID(), Vec3.ZERO);
+            vel = realVelocities.getOrDefault(player.getUUID(), Vec3.ZERO);
+        } else {
+            // Якщо ціль - інший моб (наприклад, голем), ванільний метод працює нормально
+            vel = target.getDeltaMovement();
         }
-        // Якщо ціль - інший моб (наприклад, голем), ванільний метод працює нормально
-        return target.getDeltaMovement();
+
+        if (vel.lengthSqr() < VELOCITY_DEADZONE * VELOCITY_DEADZONE) {
+            return Vec3.ZERO; // обрізаємо мікроскопічний "хвіст" lerp-згасання — ціль фактично нерухома
+        }
+        return vel;
     }
 }
