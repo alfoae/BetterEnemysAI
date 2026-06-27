@@ -70,6 +70,8 @@ public class BetterDrownedGoalAi extends Goal {
         double distanceSq = this.mob.distanceToSqr(target.getX(), target.getY(), target.getZ());
         boolean canSee = this.mob.getSensing().hasLineOfSight(target);
         boolean isSeeing = this.seeTime > 0;
+        double followRange = this.mob.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
+        double maxShootDistance = followRange * 0.75;
 
         if (canSee != isSeeing) {
             this.seeTime = 0;
@@ -141,7 +143,7 @@ public class BetterDrownedGoalAi extends Goal {
         if (this.mob.isUsingItem()) {
             if (!canSee && this.seeTime < -60) {
                 this.mob.stopUsingItem();
-            } else if (canSee) {
+            } else if (canSee || distanceSq <= maxShootDistance * maxShootDistance) {
                 int useTime = this.mob.getTicksUsingItem();
                 if (useTime >= 20) { // 1 секунда замаху
 
@@ -165,7 +167,7 @@ public class BetterDrownedGoalAi extends Goal {
                     }
 
                     if (aim != null) {
-                        if (!ProjectileTrajectoryUtils.isPathClear(this.mob, aim, 0.25)) // перевірка траекторії
+                        if (!ProjectileTrajectoryUtils.isPathClear(this.mob, aim, 0.30)) // перевірка траекторії
                         {
                             return;
                         }

@@ -75,7 +75,7 @@ public class BetterGhastGoalAi extends Goal {
                 double travelDistance = shooterOrigin.distanceTo(target.position()) + 4.0; // +запас, щоб капсула напевно дотягнулась до цілі й трохи за неї
                 Vec3 aimPoint = shooterOrigin.add(dir.scale(travelDistance));
 
-                if (!ProjectileTrajectoryUtils.isPathClear(this.ghast, shooterOrigin, aimPoint, 0.5)) // перевірка траекторії
+                if (!ProjectileTrajectoryUtils.isPathClear(this.ghast, shooterOrigin, aimPoint, 0.6)) // перевірка траекторії
                 {
                     return;
                 }

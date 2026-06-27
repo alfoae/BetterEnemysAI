@@ -44,7 +44,7 @@ public class СhangeSearchRadius {
         // 2. РОЗБІЙНИКИ
         // ==========================================
         event.add(EntityType.PILLAGER, Attributes.FOLLOW_RANGE, 45.0);
-        event.add(EntityType.VINDICATOR, Attributes.FOLLOW_RANGE, 20.0);
+        event.add(EntityType.VINDICATOR, Attributes.FOLLOW_RANGE, 45.0);
         event.add(EntityType.EVOKER, Attributes.FOLLOW_RANGE, 25.0);
         event.add(EntityType.VEX, Attributes.FOLLOW_RANGE, 20.0);
         event.add(EntityType.RAVAGER, Attributes.FOLLOW_RANGE, 30.0);

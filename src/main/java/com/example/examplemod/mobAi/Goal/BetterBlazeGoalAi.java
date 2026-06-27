@@ -112,7 +112,7 @@ public class BetterBlazeGoalAi extends Goal {
         Vec3 shooterOrigin = new Vec3(this.blaze.getX(), this.blaze.getY(0.5) + 0.5, this.blaze.getZ());
         Vec3 dir = predictedPos.subtract(shooterOrigin).normalize();
 
-        if (!ProjectileTrajectoryUtils.isPathClear(this.blaze, shooterOrigin, predictedPos, 0.4))  // перевірка траекторії
+        if (!ProjectileTrajectoryUtils.isPathClear(this.blaze, shooterOrigin, predictedPos, 0.18))  // перевірка траекторії
         {
             return;
         }

@@ -72,6 +72,8 @@ public class BetterSkeletonGoalAi extends Goal {
         double distanceSq = this.mob.distanceToSqr(target.getX(), target.getY(), target.getZ());
         boolean canSee = this.mob.getSensing().hasLineOfSight(target);
         boolean isSeeing = this.seeTime > 0;
+        double followRange = this.mob.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
+        double maxShootDistance = followRange * 0.75;
 
         if (canSee != isSeeing) {
             this.seeTime = 0;
@@ -119,7 +121,7 @@ public class BetterSkeletonGoalAi extends Goal {
         if (this.mob.isUsingItem()) {
             if (!canSee && this.seeTime < -60) {
                 this.mob.stopUsingItem();
-            } else if (canSee) {
+            } else if (canSee || distanceSq <= maxShootDistance * maxShootDistance) {
                 int useTime = this.mob.getTicksUsingItem();
                 // 20 тіків = 1 секунда (повний натяг лука)
                 if (useTime >= 20) {
@@ -130,7 +132,7 @@ public class BetterSkeletonGoalAi extends Goal {
                     // інкапсульована тут. Якщо навіть ІДЕАЛЬНИЙ (без похибки) вистріл заблокований
                     // союзником — повертає null, і похибка навіть не рахується.
                     AdvancedAimMath.AimResult aim = ProjectileTrajectoryUtils.resolveBallisticAimWithMissCheck(
-                            this.mob, target, 3.0f, realVel.scale(1.8), 0.25
+                            this.mob, target, 3.0f, realVel.scale(1.8), 0.30
                     );
 
                     if (aim != null) {

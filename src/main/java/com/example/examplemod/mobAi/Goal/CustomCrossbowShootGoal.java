@@ -5,6 +5,7 @@ import com.example.examplemod.utils.PlayerVelocityTracker;
 import com.example.examplemod.utils.ProjectileTrajectoryUtils;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.Pillager;
@@ -74,6 +75,11 @@ public class CustomCrossbowShootGoal extends Goal {
                 this.attackTimer = 5; // Час, поки він просто стоїть з націленим арбалетом
             }
         } else if (state == 2) {
+            double followRange = mob.getAttributeValue(Attributes.FOLLOW_RANGE); // або mob для CustomCrossbowShootGoal
+            if (target.distanceToSqr(mob) > Math.pow(followRange * 0.75, 2)) {
+                this.attackTimer = 1;
+                return; // занадто далеко — не стріляємо, чекаємо
+            }
             this.attackTimer--;
             if (this.attackTimer <= 0) {
 
@@ -86,7 +92,7 @@ public class CustomCrossbowShootGoal extends Goal {
                     return;
                 }
 
-                if (!ProjectileTrajectoryUtils.isPathClear(mob, aim, 0.25)) {
+                if (!ProjectileTrajectoryUtils.isPathClear(mob, aim, 0.30)) {
                     // Союзник на лінії вогню — арбалет ЗАЛИШАЄТЬСЯ заряджений (state не змінюємо,
                     // CHARGED_PROJECTILES не чистимо), просто чекаємо і перевіряємо знову наступний тік.
                     this.attackTimer = 1;

@@ -6,6 +6,7 @@ import com.example.examplemod.utils.ProjectileTrajectoryUtils;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.behavior.Behavior;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.ai.memory.MemoryStatus;
@@ -93,6 +94,11 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
                 this.attackTimer = 5;
             }
         } else if (state == 2) {
+            double followRange = piglin.getAttributeValue(Attributes.FOLLOW_RANGE); // або mob для CustomCrossbowShootGoal
+            if (target.distanceToSqr(piglin) > Math.pow(followRange * 0.75, 2)) {
+                this.attackTimer = 1;
+                return; // занадто далеко — не стріляємо, чекаємо
+            }
             this.attackTimer--;
             if (this.attackTimer <= 0) {
 
@@ -108,7 +114,7 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
                     return;
                 }
 
-                if (!ProjectileTrajectoryUtils.isPathClear(piglin, aim, 0.25)) {
+                if (!ProjectileTrajectoryUtils.isPathClear(piglin, aim, 0.30)) {
                     // Союзник на лінії вогню — арбалет ЗАЛИШАЄТЬСЯ заряджений (state не змінюємо,
                     // CHARGED_PROJECTILES не чистимо), просто чекаємо ще тік і перевіряємо знову.
                     this.attackTimer = 1;
