@@ -25,7 +25,7 @@ import java.util.Optional;
  * перенесене з геометрії снаряда на геометрію цілі: математично еквівалентно тунелю, але
  * без купи окремих перевірок (вершини/найближча точка/кутові лінії), які раніше давали баги.
  */
-public class ProjectileTrajectoryUtils {
+public class ProjectileTrajectory {
 
     /**
      * Чи вільний шлях від startPos до aimPoint від союзників.

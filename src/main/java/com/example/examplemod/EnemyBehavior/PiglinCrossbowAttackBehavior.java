@@ -2,7 +2,7 @@ package com.example.examplemod.EnemyBehavior;
 
 import com.example.examplemod.utils.AdvancedAimMath;
 import com.example.examplemod.utils.PlayerVelocityTracker;
-import com.example.examplemod.utils.ProjectileTrajectoryUtils;
+import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -114,7 +114,7 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
                     return;
                 }
 
-                if (!ProjectileTrajectoryUtils.isPathClear(piglin, aim, 0.30)) {
+                if (!ProjectileTrajectory.isPathClear(piglin, aim, 0.30)) {
                     // Союзник на лінії вогню — арбалет ЗАЛИШАЄТЬСЯ заряджений (state не змінюємо,
                     // CHARGED_PROJECTILES не чистимо), просто чекаємо ще тік і перевіряємо знову.
                     this.attackTimer = 1;

@@ -81,7 +81,7 @@ public class AdvancedAimMath {
      * <p>
      * Це тонка обгортка над {@link #applyMissChance} для зворотної сумісності зі старими
      * викликами. Для нового сценарію "перевірити шлях до похибки і перерахувати при потребі"
-     * використовуй {@link com.example.examplemod.utils.ProjectileTrajectoryUtils#resolveAimWithMissCheck}.
+     * використовуй {@link ProjectileTrajectory#resolveAimWithMissCheck}.
      */
     public static AimResult calculateAim(Mob shooter, LivingEntity target, float baseProjectileSpeed, Vec3 targetVel) {
         AimResult precise = calculatePreciseAim(shooter, target, baseProjectileSpeed, targetVel);

@@ -1,7 +1,7 @@
 package com.example.examplemod.mobAi.Goal;
 
 import com.example.examplemod.utils.AdvancedAimMath;
-import com.example.examplemod.utils.ProjectileTrajectoryUtils;
+import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Ghast;
@@ -75,7 +75,7 @@ public class BetterGhastGoalAi extends Goal {
                 double travelDistance = shooterOrigin.distanceTo(target.position()) + 4.0; // +запас, щоб капсула напевно дотягнулась до цілі й трохи за неї
                 Vec3 aimPoint = shooterOrigin.add(dir.scale(travelDistance));
 
-                if (!ProjectileTrajectoryUtils.isPathClear(this.ghast, shooterOrigin, aimPoint, 0.6)) // перевірка траекторії
+                if (!ProjectileTrajectory.isPathClear(this.ghast, shooterOrigin, aimPoint, 0.6)) // перевірка траекторії
                 {
                     return;
                 }

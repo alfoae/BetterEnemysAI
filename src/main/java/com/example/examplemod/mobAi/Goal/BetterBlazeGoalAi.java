@@ -1,6 +1,6 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.utils.ProjectileTrajectoryUtils;
+import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -112,7 +112,7 @@ public class BetterBlazeGoalAi extends Goal {
         Vec3 shooterOrigin = new Vec3(this.blaze.getX(), this.blaze.getY(0.5) + 0.5, this.blaze.getZ());
         Vec3 dir = predictedPos.subtract(shooterOrigin).normalize();
 
-        if (!ProjectileTrajectoryUtils.isPathClear(this.blaze, shooterOrigin, predictedPos, 0.18))  // перевірка траекторії
+        if (!ProjectileTrajectory.isPathClear(this.blaze, shooterOrigin, predictedPos, 0.18))  // перевірка траекторії
         {
             return;
         }

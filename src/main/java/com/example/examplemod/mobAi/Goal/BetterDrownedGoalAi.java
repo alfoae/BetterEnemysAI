@@ -1,7 +1,7 @@
 package com.example.examplemod.mobAi.Goal;
 
 import com.example.examplemod.utils.AdvancedAimMath;
-import com.example.examplemod.utils.ProjectileTrajectoryUtils;
+import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Drowned;
@@ -167,7 +167,7 @@ public class BetterDrownedGoalAi extends Goal {
                     }
 
                     if (aim != null) {
-                        if (!ProjectileTrajectoryUtils.isPathClear(this.mob, aim, 0.30)) // перевірка траекторії
+                        if (!ProjectileTrajectory.isPathClear(this.mob, aim, 0.30)) // перевірка траекторії
                         {
                             return;
                         }

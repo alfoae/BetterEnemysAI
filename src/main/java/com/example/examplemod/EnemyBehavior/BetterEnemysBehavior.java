@@ -134,6 +134,18 @@ public class BetterEnemysBehavior {
             }
 
             // (Големи вже в оригінальній грі запрограмовані бити всіх монстрів, розбійників та піглінів, тому їх AI не чіпаємо)
+
+            // 4. ГЛОБАЛЬНА "ПАМ'ЯТЬ ПРО ЦІЛЬ" — переслідування гравця крізь стіни в межах
+            // повного FOLLOW_RANGE, з рухом до останньої відомої позиції після виходу за радіус.
+            // Пріоритет 0 — найвищий, щоб встигнути скоригувати ціль/навігацію раніше за Goal-и
+            // стрільби й ближнього бою. supportsSearchBehavior=true лише для мобів БЕЗ накопиченого
+            // заряду (AbstractSkeleton, Drowned) — вони після прибуття на точку ще 15с "никаються"
+            // з натягнутою тетивою перш ніж остаточно втратити ціль.
+            if (isMonsterFaction || isIllagerFaction || isPiglinFaction) {
+                boolean searchBehavior = mob instanceof net.minecraft.world.entity.monster.AbstractSkeleton
+                        || mob instanceof net.minecraft.world.entity.monster.Drowned;
+                mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, searchBehavior));
+            }
         }
     }
 }

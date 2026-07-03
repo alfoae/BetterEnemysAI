@@ -1,7 +1,8 @@
 package com.example.examplemod.mobAi.Goal;
 
+import com.example.examplemod.EnemyBehavior.PursuitEnemyBehavior;
 import com.example.examplemod.utils.AdvancedAimMath;
-import com.example.examplemod.utils.ProjectileTrajectoryUtils;
+import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.AbstractSkeleton;
@@ -57,6 +58,7 @@ public class BetterSkeletonGoalAi extends Goal {
     public void stop() {
         super.stop();
         this.mob.setAggressive(false);
+        this.mob.setSprinting(false);
         this.seeTime = 0;
         this.attackTime = -1;
         this.mob.stopUsingItem();
@@ -70,10 +72,12 @@ public class BetterSkeletonGoalAi extends Goal {
         }
 
         double distanceSq = this.mob.distanceToSqr(target.getX(), target.getY(), target.getZ());
-        boolean canSee = this.mob.getSensing().hasLineOfSight(target);
-        boolean isSeeing = this.seeTime > 0;
         double followRange = this.mob.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
-        double maxShootDistance = followRange * 0.75;
+        double maxShootDistanceSq = (followRange * 0.75) * (followRange * 0.75);
+        // canSee враховує і пряму видимість І дистанцію стрільби — Sensing.hasLineOfSight()
+        // не перевіряє FOLLOW_RANGE, тому без цієї перевірки скелет міг стріляти за межею радіуса.
+        boolean canSee = distanceSq <= maxShootDistanceSq && this.mob.getSensing().hasLineOfSight(target);
+        boolean isSeeing = this.seeTime > 0;
 
         if (canSee != isSeeing) {
             this.seeTime = 0;
@@ -84,12 +88,30 @@ public class BetterSkeletonGoalAi extends Goal {
             --this.seeTime;
         }
 
+        // Чи моб зараз "переслідує крізь стіни" по глобальній пам'яті про ціль, і куди саме:
+        // жива позиція гравця (в межах повного FOLLOW_RANGE) або застигла остання відома точка
+        // (гравець вийшов за радіус — туди вже НЕ оновлюємо позицію, просто доходимо).
+        boolean memoryChasing = PursuitEnemyBehavior.isMemoryChasing(this.mob);
+        boolean drawBow = PursuitEnemyBehavior.shouldDrawBowstring(this.mob);
+        Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
+
+        // Швидкість: "панічний біг" до точки або під час пошуку — та ж, що й тікання від вовка.
+        // Звичайний бій (є canSee) — стандартна speedModifier.
+        double currentSpeed = (memoryChasing && !canSee) ? 1.4 : this.speedModifier;
+
         // Логіка переміщення (ванільний стрейф навколо цілі)
         if (distanceSq <= 225.0D && this.seeTime >= 20) {
             this.mob.getNavigation().stop();
+            this.mob.setSprinting(false);
             ++this.strafingTime;
+        } else if (chasePos != null) {
+            this.mob.getNavigation().moveTo(chasePos.x, chasePos.y, chasePos.z, currentSpeed);
+            // setSprinting дає реальний біг (як тікання від вовка), а не просто прискорений хід.
+            this.mob.setSprinting(!canSee);
+            this.strafingTime = -1;
         } else {
-            this.mob.getNavigation().moveTo(target, this.speedModifier);
+            this.mob.getNavigation().moveTo(target, currentSpeed);
+            this.mob.setSprinting(false);
             this.strafingTime = -1;
         }
 
@@ -111,42 +133,46 @@ public class BetterSkeletonGoalAi extends Goal {
             }
             this.mob.getMoveControl().strafe(this.strafingBackwards ? -0.5F : 0.5F, this.strafingClockwise ? 0.5F : -0.5F);
             this.mob.lookAt(target, 30.0F, 30.0F);
+        } else if (chasePos != null) {
+            // Під час бігу до точки навігація сама повертає моба — не заважаємо їй щотіку
+            // викликом setLookAt (це і давало дергання голови вгору-вниз). Лише якщо є реальна
+            // ціль — дивимось на рівень її очей (не ніг), щоб голова не задиралась/опускалась.
+            if (canSee) {
+                this.mob.getLookControl().setLookAt(
+                        target.getX(), target.getEyeY(), target.getZ(), 30.0F, 30.0F);
+            }
+            // canSee == false: голова йде туди куди веде навігація — природньо
         } else {
-            this.mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
+            this.mob.getLookControl().setLookAt(
+                    target.getX(), target.getEyeY(), target.getZ(), 30.0F, 30.0F);
         }
 
         // ========================================================
         // ЛОГІКА СТРІЛЬБИ
         // ========================================================
         if (this.mob.isUsingItem()) {
-            if (!canSee && this.seeTime < -60) {
+            if (!canSee && !drawBow) {
+                // Немає видимості і не в зоні натягу — відпускаємо лук повністю.
+                // При memoryChasing (біжимо до точки) це дає ефект "опустив лук і побіг".
                 this.mob.stopUsingItem();
-            } else if (canSee || distanceSq <= maxShootDistance * maxShootDistance) {
+                this.attackTime = this.attackIntervalMin; // заново чекатиме перед натягом
+            } else if (canSee) {
                 int useTime = this.mob.getTicksUsingItem();
-                // 20 тіків = 1 секунда (повний натяг лука)
                 if (useTime >= 20) {
-
                     Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
-
-                    // Уся логіка "точний приціл -> перевірка -> похибка -> перевірка -> ретраї"
-                    // інкапсульована тут. Якщо навіть ІДЕАЛЬНИЙ (без похибки) вистріл заблокований
-                    // союзником — повертає null, і похибка навіть не рахується.
-                    AdvancedAimMath.AimResult aim = ProjectileTrajectoryUtils.resolveBallisticAimWithMissCheck(
-                            this.mob, target, 3.0f, realVel.scale(1.8), 0.30
+                    AdvancedAimMath.AimResult aim = ProjectileTrajectory.resolveBallisticAimWithMissCheck(
+                            this.mob, target, 3.0f, realVel.scale(1.8), 0.25
                     );
-
                     if (aim != null) {
                         debugLogShot(target, aim, realVel);
                         shootCustomArrow(aim);
-                        // Скидаємо таймери ТІЛЬКИ після фактичного пострілу
                         this.mob.stopUsingItem();
                         this.attackTime = this.attackIntervalMin;
                     }
-                    // якщо aim == null — арбалет/лук ЛИШАЄТЬСЯ натягнутим (заряд тримається),
-                    // нічого не скидаємо, наступний тік перевірка повториться знову
                 }
+                // canSee == false але memoryChasing/drawBow == true: лук лишається натягнутим без пострілу.
             }
-        } else if (--this.attackTime <= 0 && this.seeTime >= -60) {
+        } else if (--this.attackTime <= 0 && (canSee || drawBow)) {
             this.mob.startUsingItem(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof BowItem));
         }
     }
@@ -172,9 +198,9 @@ public class BetterSkeletonGoalAi extends Goal {
                 || Math.abs(precise.dZ() - finalAim.dZ()) > 1.0e-6;
 
         Vec3 startForCheck = this.mob.getEyePosition();
-        boolean preciseBlocked = !ProjectileTrajectoryUtils.isPathClearBallistic(
+        boolean preciseBlocked = !ProjectileTrajectory.isPathClearBallistic(
                 this.mob, startForCheck, startForCheck.add(precise.dX(), precise.dY(), precise.dZ()), precise.velocity(), 0.28);
-        boolean finalBlocked = !ProjectileTrajectoryUtils.isPathClearBallistic(
+        boolean finalBlocked = !ProjectileTrajectory.isPathClearBallistic(
                 this.mob, startForCheck, aimPoint, finalAim.velocity(), 0.28);
 
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
