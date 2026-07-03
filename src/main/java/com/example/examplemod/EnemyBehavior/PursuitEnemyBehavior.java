@@ -65,26 +65,41 @@ public class PursuitEnemyBehavior extends Goal {
      * коли моб деспавнився/вивантажився і на нього більше немає сильних посилань).
      */
     private static final Map<Mob, MemoryData> MEMORY = new WeakHashMap<>();
-    private final Mob mob;
     /**
-     * Чи підтримує цей моб фазу SEARCHING (15с "никання" з натягнутою тетивою) після прибуття
-     * на застиглу точку. True лише для мобів БЕЗ накопиченого заряду — скелет/stray/bogged,
-     * дроунд із тризубом. Арбалетники (своя "перезарядка") і блейз/гаст (інша механіка пострілу)
-     * сюди НЕ входять — для них фіксована точка просто веде одразу до FORGOTTEN, як і раніше.
+     * Зберігає sprintSpeedModifier для кожного моба — читається Goal-ами через getSprintSpeedModifier.
      */
+    private static final Map<Mob, Double> SPRINT_SPEED = new WeakHashMap<>();
+    private final Mob mob;
     private final boolean supportsSearchBehavior;
+    /**
+     * Множник швидкості для moveTo під час бігу до застиглої точки (GOING_TO_LAST_SEEN) або
+     * пошуку (SEARCHING). Задається при реєстрації Goal-у в BetterEnemysBehavior окремо для
+     * кожного моба. Зчитується стрілецькими/мелі Goal-ами через getSprintSpeedModifier(mob).
+     */
+    private final double sprintSpeedModifier;
 
     public PursuitEnemyBehavior(Mob mob) {
-        this(mob, false);
+        this(mob, false, 1.4);
     }
 
     public PursuitEnemyBehavior(Mob mob, boolean supportsSearchBehavior) {
+        this(mob, supportsSearchBehavior, 1.4);
+    }
+
+    public PursuitEnemyBehavior(Mob mob, boolean supportsSearchBehavior, double sprintSpeedModifier) {
         this.mob = mob;
         this.supportsSearchBehavior = supportsSearchBehavior;
-        // ПОРОЖНІ флаги: цей Goal НІКОЛИ не рухає моба і не блокує MOVE/LOOK сам по собі.
-        // Сам рух "крізь стіни" виконують стрілецькі/мелі Goal-и мобів через
-        // shouldChaseThroughWalls(mob)/getChaseTarget(mob) у власній вже наявній логіці навігації.
+        this.sprintSpeedModifier = sprintSpeedModifier;
+        SPRINT_SPEED.put(mob, sprintSpeedModifier);
         this.setFlags(EnumSet.noneOf(Goal.Flag.class));
+    }
+
+    /**
+     * Множник швидкості для moveTo під час бігу — для використання в Goal-ах стрільби/мелі.
+     * Повертає 1.0 якщо моб не має зареєстрованого PursuitEnemyBehavior.
+     */
+    public static double getSprintSpeedModifier(Mob mob) {
+        return SPRINT_SPEED.getOrDefault(mob, 1.0);
     }
 
     /**
@@ -181,6 +196,10 @@ public class PursuitEnemyBehavior extends Goal {
         // GOING_TO_LAST_SEEN і SEARCHING мають свою окрему логіку тіку.
         if (data.state == State.GOING_TO_LAST_SEEN) {
             tickGoingToLastSeen(data);
+            // Спринт для мелі-мобів під час бігу до точки.
+            if (!supportsSearchBehavior) {
+                this.mob.setSprinting(true);
+            }
             return;
         }
         if (data.state == State.SEARCHING) {
@@ -190,6 +209,9 @@ public class PursuitEnemyBehavior extends Goal {
 
         Player player = findCandidatePlayer();
         if (player == null) {
+            if (!supportsSearchBehavior) {
+                this.mob.setSprinting(false);
+            }
             return;
         }
 
@@ -203,15 +225,17 @@ public class PursuitEnemyBehavior extends Goal {
             data.state = State.CHASING;
             data.trackedPlayer = player;
             reinforceTarget(player);
+            // Мелі-моби спринтують завжди коли заагрені (стан CHASING).
+            // Для мобів зі стрільбою (supportsSearchBehavior) спринт керується їх власним Goal-ом.
+            if (!supportsSearchBehavior) {
+                this.mob.setSprinting(true);
+            }
             // Оновлюємо lastVisiblePos ТІЛЬКИ коли моб реально бачить гравця (не через стіну).
-            // Це і є "остання відома позиція" яку запам'ятаємо при виході за радіус.
             if (this.mob.getSensing().hasLineOfSight(player)) {
                 data.lastVisiblePos = player.position();
             }
         } else if (data.state == State.CHASING) {
             // Вийшов за межі FOLLOW_RANGE — фіксуємо ОСТАННЮ ВИДИМУ позицію (не поточну!).
-            // Якщо гравець вийшов за стіну а потім за радіус — lastVisiblePos буде там де він
-            // був видимий останній раз, а не там де він зараз.
             Vec3 fixedPos = data.lastVisiblePos != null ? data.lastVisiblePos : player.position();
             data.state = State.GOING_TO_LAST_SEEN;
             data.lastSeenPos = fixedPos;
@@ -398,6 +422,9 @@ public class PursuitEnemyBehavior extends Goal {
         data.lastVisiblePos = null;
         data.lastSeenPos = null;
         data.searchPoint = null;
+        if (!supportsSearchBehavior) {
+            this.mob.setSprinting(false);
+        }
         if (this.mob.getTarget() instanceof Player) {
             this.mob.setTarget(null);
         }

@@ -95,9 +95,9 @@ public class BetterSkeletonGoalAi extends Goal {
         boolean drawBow = PursuitEnemyBehavior.shouldDrawBowstring(this.mob);
         Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
 
-        // Швидкість: "панічний біг" до точки або під час пошуку — та ж, що й тікання від вовка.
-        // Звичайний бій (є canSee) — стандартна speedModifier.
-        double currentSpeed = (memoryChasing && !canSee) ? 1.4 : this.speedModifier;
+        // Швидкість бігу береться з PursuitEnemyBehavior (задається при реєстрації в BetterEnemysBehavior).
+        double sprintSpeed = PursuitEnemyBehavior.getSprintSpeedModifier(this.mob);
+        double currentSpeed = (memoryChasing && !canSee) ? sprintSpeed : this.speedModifier;
 
         // Логіка переміщення (ванільний стрейф навколо цілі)
         if (distanceSq <= 225.0D && this.seeTime >= 20) {
