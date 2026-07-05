@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Goal;
 
+import com.example.examplemod.EnemyBehavior.PursuitEnemyBehavior;
 import com.example.examplemod.utils.AdvancedAimMath;
 import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.world.entity.LivingEntity;
@@ -29,6 +30,7 @@ public class BetterDrownedGoalAi extends Goal {
         this.speedModifier = speedModifier;
         this.attackIntervalMin = attackIntervalMin;
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true, 1.0));
     }
 
     @Override

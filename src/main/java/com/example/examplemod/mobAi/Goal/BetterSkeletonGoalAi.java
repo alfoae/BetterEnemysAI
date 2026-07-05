@@ -31,6 +31,7 @@ public class BetterSkeletonGoalAi extends Goal {
         this.speedModifier = speedModifier;
         this.attackIntervalMin = attackIntervalMin;
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true, 1.0));
     }
 
     @Override

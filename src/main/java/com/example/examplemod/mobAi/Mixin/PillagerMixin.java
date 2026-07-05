@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
+import com.example.examplemod.EnemyBehavior.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.CustomCrossbowShootGoal;
 import com.example.examplemod.mobAi.Goal.SwapWeaponGoal;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
@@ -17,15 +18,11 @@ public class PillagerMixin {
 
     @Inject(method = "registerGoals", at = @At("TAIL"))
     private void addDualModeAI(CallbackInfo ci) {
-        Pillager mob = (Pillager) (Object) this; // У VindicatorMixin тут буде Vindicator
+        Pillager mob = (Pillager) (Object) this;
 
-        // 1. Фонова зміна зброї (Не блокує рух, пріоритет 1)
+        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true, 1.0));
         mob.goalSelector.addGoal(1, new SwapWeaponGoal(mob));
-
-        // 2. Наша кастомна стрільба з випередженням (Працює тільки коли далеко)
         mob.goalSelector.addGoal(2, new CustomCrossbowShootGoal(mob));
-
-        // 3. Ближній бій (Працює тільки коли близько і є топор)
         mob.goalSelector.addGoal(3, new MeleeAttackGoal(mob, 1.2D, false) {
             @Override
             public boolean canUse() {
@@ -42,7 +39,6 @@ public class PillagerMixin {
             if (pillager.isUsingItem()) {
                 cir.setReturnValue(AbstractIllager.IllagerArmPose.CROSSBOW_CHARGE);
             } else if (pillager.isAggressive()) {
-                // Саме це змушує його опустити арбалет горизонтально після зарядки
                 cir.setReturnValue(AbstractIllager.IllagerArmPose.CROSSBOW_HOLD);
             }
         }

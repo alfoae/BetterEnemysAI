@@ -69,6 +69,19 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
         LivingEntity target = piglin.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET).orElse(null);
         if (target == null) return;
 
+        // Якщо немає прямої видимості — йдемо до точки переслідування (застигла точка або
+        // жива позиція крізь стіни) замість того щоб стояти і чекати.
+        boolean canSee = piglin.getSensing().hasLineOfSight(target);
+        net.minecraft.world.phys.Vec3 chasePos =
+                PursuitEnemyBehavior.getChasePosition(piglin);
+        if (!canSee && chasePos != null) {
+            double sprintSpeed = PursuitEnemyBehavior.getSprintSpeedModifier(piglin);
+            piglin.getNavigation().moveTo(chasePos.x, chasePos.y, chasePos.z, sprintSpeed);
+            piglin.setSprinting(true);
+            return;
+        }
+        piglin.setSprinting(false);
+
         piglin.getLookControl().setLookAt(target, 30.0F, 30.0F);
         ItemStack crossbow = piglin.getMainHandItem();
 

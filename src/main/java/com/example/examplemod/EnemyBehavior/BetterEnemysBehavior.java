@@ -134,49 +134,7 @@ public class BetterEnemysBehavior {
             }
 
             // (Големи вже в оригінальній грі запрограмовані бити всіх монстрів, розбійників та піглінів, тому їх AI не чіпаємо)
-
-            // 4. ГЛОБАЛЬНА "ПАМ'ЯТЬ ПРО ЦІЛЬ" — переслідування гравця крізь стіни в межах
-            // повного FOLLOW_RANGE, з рухом до останньої відомої позиції після виходу за радіус.
-            // Пріоритет 0 — найвищий, щоб встигнути скоригувати ціль/навігацію раніше за Goal-и
-            // стрільби й ближнього бою. supportsSearchBehavior=true лише для мобів БЕЗ накопиченого
-            // заряду (AbstractSkeleton, Drowned) — вони після прибуття на точку ще 15с "никаються"
-            // з натягнутою тетивою перш ніж остаточно втратити ціль.
-            // Літаючі моби (Blaze, Ghast, Breeze) виключені — у них інша механіка пересування
-            // і PursuitEnemyBehavior з наземною навігацією для них не підходить.
-            boolean isFlyingMob = mob instanceof net.minecraft.world.entity.FlyingMob
-                    || mob instanceof net.minecraft.world.entity.monster.Ghast
-                    || mob instanceof net.minecraft.world.entity.monster.breeze.Breeze;
-            if ((isMonsterFaction || isIllagerFaction || isPiglinFaction) && !isFlyingMob) {
-                boolean searchBehavior = mob instanceof net.minecraft.world.entity.monster.AbstractSkeleton
-                        || mob instanceof net.minecraft.world.entity.monster.Drowned;
-
-                // Множник швидкості для moveTo під час бігу до останньої відомої точки.
-                // Підбирай під кожного моба: значення = бажана швидкість бігу / базовий MOVEMENT_SPEED.
-                // Наприклад скелет (MOVEMENT_SPEED=0.25): sprintSpeed=1.0 → та сама швидкість що й бій,
-                // 1.4 → швидше, 0.52 → приблизно як гравець зі спринтом (~5.6 блоків/сек).
-                double sprintSpeed;
-                if (mob instanceof net.minecraft.world.entity.monster.AbstractSkeleton
-                        || mob instanceof net.minecraft.world.entity.monster.Drowned) {
-                    sprintSpeed = 1.0; // скелет/дроунд — помірний біг
-                } else if (mob instanceof net.minecraft.world.entity.monster.Zombie
-                        || mob instanceof net.minecraft.world.entity.monster.ZombieVillager
-                        || mob instanceof net.minecraft.world.entity.monster.Husk) {
-                    sprintSpeed = 1.0; // зомбі — помірний біг
-                } else if (mob instanceof net.minecraft.world.entity.monster.Spider
-                        || mob instanceof net.minecraft.world.entity.monster.CaveSpider) {
-                    sprintSpeed = 1.0; // павук — помірний біг
-                } else if (mob instanceof net.minecraft.world.entity.monster.Creeper) {
-                    sprintSpeed = 1.0; // кріпер — помірний біг
-                } else if (mob instanceof net.minecraft.world.entity.monster.AbstractIllager) {
-                    sprintSpeed = 1.0; // розбійники — помірний біг
-                } else if (mob instanceof net.minecraft.world.entity.monster.piglin.AbstractPiglin) {
-                    sprintSpeed = 1.0; // пігліни — помірний біг
-                } else {
-                    sprintSpeed = 1.0; // всі інші — помірний біг
-                }
-
-                mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, searchBehavior, sprintSpeed));
-            }
+            // PursuitEnemyBehavior реєструється окремо в кожному Goal/Mixin файлі моба.
         }
     }
 }

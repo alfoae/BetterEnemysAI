@@ -7,13 +7,18 @@
   "mixins": [
     "BlazeMixin",
     "BreezeMixin",
+    "CreeperMixin",
     "DrownedMixin",
     "GhastMixin",
+    "IronGolemMixin",
     "MobWeaponStorageMixin",
+    "PiglinBruteMixin",
     "PiglinMixin",
     "PillagerMixin",
     "SkeletonMixin",
-    "VindicatorMixin"
+    "VindicatorMixin",
+    "WitherSkeletonMixin",
+    "ZombieMixin"
   ],
   "client": [],
   "injectors": {

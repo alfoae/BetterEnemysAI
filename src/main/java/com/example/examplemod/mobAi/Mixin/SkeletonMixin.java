@@ -13,16 +13,12 @@ public class SkeletonMixin {
 
     @Inject(method = "registerGoals", at = @At("TAIL"))
     private void examplemod$replaceSkeletonGoal(CallbackInfo ci) {
-
         AbstractSkeleton skeleton = (AbstractSkeleton) (Object) this;
 
         skeleton.goalSelector.getAvailableGoals().removeIf(goal ->
                 goal.getGoal() instanceof RangedBowAttackGoal
         );
 
-        skeleton.goalSelector.addGoal(
-                1,
-                new BetterSkeletonGoalAi(skeleton, 1.0D, 20)
-        );
+        skeleton.goalSelector.addGoal(1, new BetterSkeletonGoalAi(skeleton, 1.0D, 20));
     }
 }
