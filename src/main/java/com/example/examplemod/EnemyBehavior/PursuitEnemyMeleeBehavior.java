@@ -13,7 +13,7 @@ import java.util.EnumSet;
  * Інтегрує PursuitEnemyBehavior: коли гравець вийшов за FOLLOW_RANGE — моб
  * біжить до застиглої останньої відомої точки або шукає гравця навколо неї.
  */
-public abstract class PursuitEnemyMeleeBehavior extends Goal {
+public class PursuitEnemyMeleeBehavior extends Goal {
 
     protected final Mob mob;
     protected final double speedModifier;
