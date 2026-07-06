@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior;
+package com.example.examplemod.EnemyBehavior.EnemyAttack;
 
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;

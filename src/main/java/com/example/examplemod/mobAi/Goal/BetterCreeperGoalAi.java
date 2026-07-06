@@ -1,6 +1,6 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.EnemyBehavior.PursuitEnemyMeleeBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyMeleeBehavior;
 import net.minecraft.world.entity.monster.Creeper;
 
 public class BetterCreeperGoalAi extends PursuitEnemyMeleeBehavior {

@@ -18,7 +18,7 @@ import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import java.util.function.Predicate;
 
 @EventBusSubscriber(modid = BetterEnemysAI.MODID)
-public class BetterEnemysBehavior {
+public class EnemyFactionRegistry {
 
     /**
      * Визначає фракцію сутності за тими ж правилами, що й onEntityJoinLevel нижче.

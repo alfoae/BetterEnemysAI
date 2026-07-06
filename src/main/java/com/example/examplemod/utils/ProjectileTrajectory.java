@@ -1,6 +1,6 @@
 package com.example.examplemod.utils;
 
-import com.example.examplemod.EnemyBehavior.BetterEnemysBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyFactionRegistry;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -14,7 +14,7 @@ import java.util.Optional;
 
 /**
  * Перевірка "чи не зачепить майбутній снаряд союзника по фракції" (фракції — у
- * {@link BetterEnemysBehavior}).
+ * {@link EnemyFactionRegistry}).
  * <p>
  * ПІДХІД (переписано з 0): снаряд — нескінченно тонкий промінь від точки вильоту до точки
  * прицілу. Товщина самого снаряда враховується НЕ геометрією навколо лінії (без тунелів,
@@ -67,7 +67,7 @@ public class ProjectileTrajectory {
             if (!(entity instanceof LivingEntity living) || entity == shooter) {
                 continue;
             }
-            if (!BetterEnemysBehavior.isSameFaction(shooter, living)) {
+            if (!EnemyFactionRegistry.isSameFaction(shooter, living)) {
                 continue; // чужі не заважають
             }
 
@@ -283,7 +283,7 @@ public class ProjectileTrajectory {
             if (!(entity instanceof LivingEntity living) || entity == shooter) {
                 continue;
             }
-            if (!BetterEnemysBehavior.isSameFaction(shooter, living)) {
+            if (!EnemyFactionRegistry.isSameFaction(shooter, living)) {
                 continue;
             }
 

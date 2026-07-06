@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior;
+package com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -7,12 +7,12 @@ import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 
 import java.util.function.Predicate;
 
-public class ConditionalBehavior<E extends LivingEntity> implements BehaviorControl<E> {
+public class EnemySwap_and_UseWeaponConditionalBehavior<E extends LivingEntity> implements BehaviorControl<E> {
 
     private final Predicate<E> condition;
     private final BehaviorControl<? super E> wrapped;
 
-    public ConditionalBehavior(Predicate<E> condition, BehaviorControl<? super E> wrapped) {
+    public EnemySwap_and_UseWeaponConditionalBehavior(Predicate<E> condition, BehaviorControl<? super E> wrapped) {
         this.condition = condition;
         this.wrapped = wrapped;
     }

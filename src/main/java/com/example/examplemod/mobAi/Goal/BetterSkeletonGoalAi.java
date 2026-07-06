@@ -1,6 +1,7 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.EnemyBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyFactionRegistry;
 import com.example.examplemod.utils.AdvancedAimMath;
 import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.world.entity.LivingEntity;
@@ -220,7 +221,7 @@ public class BetterSkeletonGoalAi extends Goal {
         // щоб точно знати позицію того, хто потенційно заважає, замість гадання.
         net.minecraft.world.phys.AABB searchBox = this.mob.getBoundingBox().inflate(50.0);
         for (net.minecraft.world.entity.Entity e : this.mob.level().getEntities(this.mob, searchBox)) {
-            if (e instanceof LivingEntity living && com.example.examplemod.EnemyBehavior.BetterEnemysBehavior.isSameFaction(this.mob, living)) {
+            if (e instanceof LivingEntity living && EnemyFactionRegistry.isSameFaction(this.mob, living)) {
                 net.minecraft.world.phys.AABB box = living.getBoundingBox();
                 player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
                         String.format(java.util.Locale.US,

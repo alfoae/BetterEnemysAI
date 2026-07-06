@@ -18,12 +18,12 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
 
-public class CustomCrossbowShootGoal extends Goal {
+public class BetterPillagerVindicatorGoalAi extends Goal {
     private final Monster mob;
     private int attackTimer;
     private int state = 0; // 0 - спокій, 1 - натягування, 2 - заряджений
 
-    public CustomCrossbowShootGoal(Monster mob) {
+    public BetterPillagerVindicatorGoalAi(Monster mob) {
         this.mob = mob;
         this.setFlags(EnumSet.of(Goal.Flag.LOOK, Goal.Flag.MOVE));
     }

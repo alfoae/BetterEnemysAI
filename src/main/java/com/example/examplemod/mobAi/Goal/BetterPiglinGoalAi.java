@@ -1,5 +1,6 @@
-package com.example.examplemod.EnemyBehavior;
+package com.example.examplemod.mobAi.Goal;
 
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.utils.AdvancedAimMath;
 import com.example.examplemod.utils.PlayerVelocityTracker;
 import com.example.examplemod.utils.ProjectileTrajectory;
@@ -28,7 +29,7 @@ import java.util.Map;
  * (з урахуванням товщини стріли) вільна від союзників по фракції.
  * Якщо союзник заважає — піглін НЕ скидає заряд, просто чекає далі з націленим арбалетом.
  */
-public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
+public class BetterPiglinGoalAi extends Behavior<Piglin> {
 
     private static final double ARROW_RADIUS = 0.25;
 
@@ -38,7 +39,7 @@ public class PiglinCrossbowAttackBehavior extends Behavior<Piglin> {
     private int state = 0; // 0 - спокій, 1 - натягування, 2 - заряджений (чекаємо чисту лінію), 3 - кулдаун після пострілу
     private int attackTimer;
 
-    public PiglinCrossbowAttackBehavior() {
+    public BetterPiglinGoalAi() {
         super(Map.of(MemoryModuleType.ATTACK_TARGET, MemoryStatus.VALUE_PRESENT));
     }
 

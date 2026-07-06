@@ -1,9 +1,9 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.EnemyBehavior.ConditionalBehavior;
-import com.example.examplemod.EnemyBehavior.PiglinCrossbowAttackBehavior;
-import com.example.examplemod.EnemyBehavior.PiglinSwapWeaponBehavior;
-import com.example.examplemod.EnemyBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon.EnemySwap_and_UseWeaponConditionalBehavior;
+import com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon.PiglinSwapWeaponBehavior;
+import com.example.examplemod.mobAi.Goal.BetterPiglinGoalAi;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.behavior.BehaviorControl;
@@ -42,7 +42,7 @@ public class PiglinMixin {
             String taskName = task.debugString().toLowerCase();
 
             if (taskName.contains("melee")) {
-                tasks.add(new ConditionalBehavior<>(
+                tasks.add(new EnemySwap_and_UseWeaponConditionalBehavior<>(
                         piglin -> piglin.getMainHandItem().is(Items.GOLDEN_SWORD),
                         task
                 ));
@@ -54,7 +54,7 @@ public class PiglinMixin {
         }
 
         tasks.add(new PiglinSwapWeaponBehavior());
-        tasks.add(new PiglinCrossbowAttackBehavior());
+        tasks.add(new BetterPiglinGoalAi());
 
         return ImmutableList.copyOf(tasks);
     }

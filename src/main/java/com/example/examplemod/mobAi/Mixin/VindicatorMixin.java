@@ -1,7 +1,7 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.EnemyBehavior.PursuitEnemyBehavior;
-import com.example.examplemod.mobAi.Goal.CustomCrossbowShootGoal;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
+import com.example.examplemod.mobAi.Goal.BetterPillagerVindicatorGoalAi;
 import com.example.examplemod.mobAi.Goal.SwapWeaponGoal;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
@@ -27,7 +27,7 @@ public abstract class VindicatorMixin extends AbstractIllager {
 
         this.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true, 1.0));
         this.goalSelector.addGoal(1, new SwapWeaponGoal(mob));
-        this.goalSelector.addGoal(2, new CustomCrossbowShootGoal(mob));
+        this.goalSelector.addGoal(2, new BetterPillagerVindicatorGoalAi(mob));
         this.goalSelector.addGoal(3, new MeleeAttackGoal(mob, 1.2D, false) {
             @Override
             public boolean canUse() {

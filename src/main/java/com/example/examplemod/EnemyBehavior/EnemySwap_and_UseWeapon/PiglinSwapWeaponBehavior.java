@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior;
+package com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon;
 
 import com.example.examplemod.utils.IWeaponStorage;
 import net.minecraft.server.level.ServerLevel;
