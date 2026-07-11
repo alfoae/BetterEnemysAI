@@ -1,6 +1,7 @@
 package com.example.examplemod.mobAi.Mixin;
 
 import com.example.examplemod.mobAi.Goal.BetterIronGolemGoalAi;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.animal.IronGolem;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -13,6 +14,11 @@ public class IronGolemMixin {
     @Inject(method = "registerGoals", at = @At("TAIL"))
     private void addBetterAI(CallbackInfo ci) {
         IronGolem mob = (IronGolem) (Object) this;
+
+        mob.goalSelector.getAvailableGoals().removeIf(goal ->
+                goal.getGoal() instanceof MeleeAttackGoal
+        );
+
         mob.goalSelector.addGoal(1, new BetterIronGolemGoalAi(mob, 1.0D));
     }
 }

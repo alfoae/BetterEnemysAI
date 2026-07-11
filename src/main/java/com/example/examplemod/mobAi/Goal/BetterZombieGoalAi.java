@@ -9,6 +9,5 @@ public class BetterZombieGoalAi extends PursuitEnemyMeleeBehavior {
     public BetterZombieGoalAi(Zombie mob, double speedModifier) {
         super(mob, speedModifier);
         mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
-        mob.goalSelector.addGoal(0, new PursuitEnemyMeleeBehavior(mob, speedModifier));
     }
 }

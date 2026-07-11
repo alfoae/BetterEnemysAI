@@ -1,6 +1,7 @@
 package com.example.examplemod.mobAi.Mixin;
 
 import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyMeleeBehavior;
 import com.example.examplemod.mobAi.Goal.BetterPillagerVindicatorGoalAi;
 import com.example.examplemod.mobAi.Goal.SwapWeaponGoal;
 import net.minecraft.world.entity.EntityType;
@@ -25,15 +26,18 @@ public abstract class VindicatorMixin extends AbstractIllager {
     private void addDualModeAI(CallbackInfo ci) {
         Vindicator mob = (Vindicator) (Object) this;
 
+        // Спочатку прибираємо ВАНІЛЬНИЙ MeleeAttackGoal (без перевірки на сокиру),
+        // інакше він конфліктуватиме з нашим кастомним нижче. Важливо: робимо це
+        // ДО addGoal(3, new PursuitEnemyMeleeBehavior(...)), щоб не знести свій же гоал.
+        this.goalSelector.getAvailableGoals().removeIf(goal ->
+                goal.getGoal() instanceof MeleeAttackGoal
+        );
+
         this.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true, 1.0));
         this.goalSelector.addGoal(1, new SwapWeaponGoal(mob));
         this.goalSelector.addGoal(2, new BetterPillagerVindicatorGoalAi(mob));
-        this.goalSelector.addGoal(3, new MeleeAttackGoal(mob, 1.2D, false) {
-            @Override
-            public boolean canUse() {
-                return super.canUse() && mob.getMainHandItem().is(Items.IRON_AXE);
-            }
-        });
+        this.goalSelector.addGoal(3, new PursuitEnemyMeleeBehavior(mob, 1.2D,
+                m -> m.getMainHandItem().is(Items.IRON_AXE)));
     }
 
     @Override

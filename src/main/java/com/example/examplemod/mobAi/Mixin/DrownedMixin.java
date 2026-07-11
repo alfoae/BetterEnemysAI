@@ -3,6 +3,7 @@ package com.example.examplemod.mobAi.Mixin;
 import com.example.examplemod.mobAi.Goal.BetterDrownedGoalAi;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.monster.Drowned;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,6 +19,7 @@ public class DrownedMixin {
 
         drowned.goalSelector.getAvailableGoals().removeIf(goal ->
                 goal.getGoal().getClass().getName().contains("Trident")
+                        || goal.getGoal() instanceof MeleeAttackGoal
         );
 
         drowned.goalSelector.addGoal(2, new BetterDrownedGoalAi(drowned, 1.0D, 40));

@@ -1,31 +1,22 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon.EnemySwap_and_UseWeaponConditionalBehavior;
 import com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon.PiglinSwapWeaponBehavior;
 import com.example.examplemod.mobAi.Goal.BetterPiglinGoalAi;
 import com.google.common.collect.ImmutableList;
-import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.monster.piglin.Piglin;
 import net.minecraft.world.entity.monster.piglin.PiglinAi;
 import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Mixin(PiglinAi.class)
 public class PiglinMixin {
-
-    @Inject(method = "makeBrain", at = @At("RETURN"), cancellable = true)
-    private static void addPursuitBehavior(Piglin piglin, Brain<Piglin> brain, CallbackInfoReturnable<Brain<?>> cir) {
-        piglin.goalSelector.addGoal(0, new PursuitEnemyBehavior(piglin, true, 1.0));
-    }
 
     @ModifyArg(
             method = "initFightActivity",
