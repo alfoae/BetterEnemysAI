@@ -81,7 +81,17 @@ public class PursuitEnemyMeleeBehavior extends Goal {
             return false;
         }
         LivingEntity target = this.mob.getTarget();
-        return target != null && this.mob.distanceToSqr(target) <= yieldDistSq;
+        if (target == null) {
+            return false;
+        }
+        // Йти в yield має сенс ТІЛЬКИ якщо реально бачимо ціль — інакше під час SEARCHING
+        // (коли жива позиція гравця може випадково опинитись поруч, хоч і схована) ми
+        // віддамо Flag.MOVE іншому Goal-у (напр. SwellGoal), який теж нічого корисного без
+        // LOS не зробить — і обидва просто зависнуть на місці, нікого не рухаючи.
+        if (!this.mob.getSensing().hasLineOfSight(target)) {
+            return false;
+        }
+        return this.mob.distanceToSqr(target) <= yieldDistSq;
     }
 
     @Override

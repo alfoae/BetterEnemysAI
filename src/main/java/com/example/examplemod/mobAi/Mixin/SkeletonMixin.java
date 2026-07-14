@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterSkeletonGoalAi;
 import net.minecraft.world.entity.ai.goal.RangedBowAttackGoal;
 import net.minecraft.world.entity.monster.AbstractSkeleton;
@@ -19,6 +20,7 @@ public class SkeletonMixin {
                 goal.getGoal() instanceof RangedBowAttackGoal
         );
 
+        skeleton.goalSelector.addGoal(0, new PursuitEnemyBehavior(skeleton, true, 1.0));
         skeleton.goalSelector.addGoal(1, new BetterSkeletonGoalAi(skeleton, 1.0D, 20));
     }
 }

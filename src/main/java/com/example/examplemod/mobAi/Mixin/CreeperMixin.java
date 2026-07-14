@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterCreeperGoalAi;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.monster.Creeper;
@@ -21,6 +22,7 @@ public class CreeperMixin {
                 goal.getGoal() instanceof MeleeAttackGoal
         );
 
+        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
         mob.goalSelector.addGoal(1, new BetterCreeperGoalAi(mob, 1.0D));
     }
 }

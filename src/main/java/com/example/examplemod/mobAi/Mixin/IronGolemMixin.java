@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterIronGolemGoalAi;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.animal.IronGolem;
@@ -19,6 +20,7 @@ public class IronGolemMixin {
                 goal.getGoal() instanceof MeleeAttackGoal
         );
 
+        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
         mob.goalSelector.addGoal(1, new BetterIronGolemGoalAi(mob, 1.0D));
     }
 }

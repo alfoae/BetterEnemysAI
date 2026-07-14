@@ -1,5 +1,6 @@
 package com.example.examplemod.EnemyBehavior.EnemyAttack;
 
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySearch.SearchGrid;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -25,9 +26,11 @@ import java.util.WeakHashMap;
  *       живою позицією гравця).</li>
  *   <li><b>SEARCHING</b> — моб дійшов до застиглої точки і там нікого немає. ТІЛЬКИ для мобів
  *       без накопиченого заряду (скелет/stray/bogged, дроунд із тризубом — НЕ арбалетники, НЕ
- *       блейз/гаст): протягом {@link #SEARCH_DURATION_TICKS} (15с) моб "никається" навколо
- *       останньої точки — раз у кілька секунд обирає нову випадкову сусідню точку й іде туди,
- *       не відпускаючи натягнуту тетиву ({@link #shouldDrawBowstring(Mob)} лишається true).</li>
+ *       блейз/гаст): протягом {@link #SEARCH_DURATION_TICKS} (15с) моб никається через
+ *       {@link SearchGrid} — динамічно "стрибає" по колу навколо своєї поточної позиції в
+ *       невідвідані напрямки (в межах FOLLOW_RANGE від початкової точки), не відпускаючи
+ *       натягнуту тетиву ({@link #shouldDrawBowstring(Mob)} лишається true). Якщо нема куди йти
+ *       (вся зона в межах радіуса вичерпана) — забуває ціль одразу, не чекаючи таймера.</li>
  *   <li><b>FORGOTTEN</b> — час пошуку вийшов без повторного бачення. Повне забуття:
  *       {@code mob.setTarget(null)}, контроль повертається звичайному AI.</li>
  * </ol>
@@ -50,16 +53,6 @@ public class PursuitEnemyBehavior extends Goal {
      * Тривалість "никання" біля останньої точки, перш ніж остаточне забуття.
      */
     private static final int SEARCH_DURATION_TICKS = 15 * 20;
-
-    /**
-     * Як часто (в тіках) моб обирає нову випадкову точку під час пошуку.
-     */
-    private static final int SEARCH_REPICK_INTERVAL_TICKS = 40; // ~2 секунди
-
-    /**
-     * Радіус, у якому обираються випадкові точки навколо останньої відомої позиції гравця.
-     */
-    private static final double SEARCH_POINT_RADIUS = 5.0;
     /**
      * Стан пам'яті прив'язаний до конкретного моба (WeakHashMap — записи самі зникають,
      * коли моб деспавнився/вивантажився і на нього більше немає сильних посилань).
@@ -240,6 +233,11 @@ public class PursuitEnemyBehavior extends Goal {
             data.state = State.GOING_TO_LAST_SEEN;
             data.lastSeenPos = fixedPos;
             data.trackedPlayer = player;
+            // Грід ставимо ВЖЕ ТУТ (а не коли SEARCHING почнеться) — поки моб іде до точки, він
+            // легким фоновим скануванням встигає позначити щось по дорозі. Сам SearchGrid більше
+            // не прив'язаний до конкретного гравця чи точки — він просто диспетчер над спільним
+            // для ВСІХ мобів GlobalSearchGrid.
+            data.searchGrid = new SearchGrid();
             debugMsg(player, String.format("[DEBUG] Доганяю ворога. Координати точки: %.1f %.1f %.1f",
                     fixedPos.x, fixedPos.y, fixedPos.z));
         }
@@ -266,6 +264,12 @@ public class PursuitEnemyBehavior extends Goal {
             return;
         }
 
+        // Легке фонове сканування вже під час підходу — ціль руху лишається lastSeenPos без змін,
+        // це лише побічний ефект (позначає щось прочеканим по дорозі).
+        if (data.searchGrid != null) {
+            data.searchGrid.lightTick(this.mob, this.mob.level().getGameTime());
+        }
+
         // DEBUG: "готуюсь до вистрілу" — раз на секунду коли вже в зоні натягу тетиви (≤8 блоків).
         double distToPoint = Math.sqrt(this.mob.position().distanceToSqr(data.lastSeenPos));
         if (distToPoint <= Math.sqrt(DRAW_BOWSTRING_DISTANCE_SQ) && data.trackedPlayer != null
@@ -286,10 +290,10 @@ public class PursuitEnemyBehavior extends Goal {
 
     /**
      * Моб "никається" навколо останньої відомої точки протягом SEARCH_DURATION_TICKS (15с):
-     * раз на SEARCH_REPICK_INTERVAL_TICKS (~2с) обирає нову випадкову точку поблизу і йде до неї.
+     * SearchGrid (сканування місцевості) сама вирішує, куди йти далі — див. {@link SearchGrid}.
      * Тетива весь цей час натягнута (shouldDrawBowstring повертає true для SEARCHING).
      * Якщо canSee стає true — миттєво виходимо в CHASING і стріляємо (тетива вже повна).
-     * Якщо час вийшов — FORGOTTEN.
+     * Якщо час вийшов АБО вся зона вже оглянута — FORGOTTEN.
      */
     private void tickSearching(MemoryData data) {
         if (tryResumeChasing(data)) {
@@ -316,24 +320,29 @@ public class PursuitEnemyBehavior extends Goal {
             }
         }
 
-        data.searchRepickCooldown--;
-        boolean needsNewPoint = data.searchRepickCooldown <= 0
-                || data.searchPoint == null
-                || hasReachedSearchPoint(data.searchPoint);
+        if (data.searchGrid == null) {
+            forgetInternal(data); // про всяк випадок, не мало б статись
+            return;
+        }
 
-        if (needsNewPoint) {
-            Vec3 newPoint = pickRandomSearchPoint(data.lastSeenPos);
-            if (newPoint != null) {
-                data.searchPoint = newPoint;
-                // DEBUG: нова точка пошуку.
-                Player debugPlayer = (this.mob.getTarget() instanceof Player p) ? p
-                        : (data.trackedPlayer != null ? data.trackedPlayer : null);
-                if (debugPlayer != null) {
-                    debugMsg(debugPlayer, String.format("[DEBUG] Шукаю ціль. Координати вибраної точки: %.1f %.1f %.1f",
-                            newPoint.x, newPoint.y, newPoint.z));
-                }
+        Vec3 prevPoint = data.searchPoint;
+        Vec3 newPoint = data.searchGrid.tick(this.mob, this.mob.level().getGameTime());
+
+        if (newPoint == null) {
+            // Вся зона в межах FOLLOW_RANGE вже оглянута напряму, гравця нема — нема сенсу
+            // чекати до кінця таймера, здаємось одразу.
+            forgetInternal(data);
+            return;
+        }
+
+        data.searchPoint = newPoint;
+        if (!newPoint.equals(prevPoint)) {
+            Player debugPlayer = (this.mob.getTarget() instanceof Player p) ? p
+                    : (data.trackedPlayer != null ? data.trackedPlayer : null);
+            if (debugPlayer != null) {
+                debugMsg(debugPlayer, String.format("[DEBUG] Шукаю ціль. Координати вибраної точки: %.1f %.1f %.1f",
+                        newPoint.x, newPoint.y, newPoint.z));
             }
-            data.searchRepickCooldown = SEARCH_REPICK_INTERVAL_TICKS;
         }
     }
 
@@ -360,6 +369,7 @@ public class PursuitEnemyBehavior extends Goal {
         data.trackedPlayer = nearbyPlayer;
         data.lastSeenPos = null;
         data.searchPoint = null;
+        data.searchGrid = null;
         reinforceTarget(nearbyPlayer);
         return true;
     }
@@ -369,41 +379,12 @@ public class PursuitEnemyBehavior extends Goal {
         // щоб ванільний targetSelector не скинув mob.getTarget() раніше ніж 15с вийдуть.
         data.state = State.SEARCHING;
         data.searchTicksLeft = SEARCH_DURATION_TICKS;
-        data.searchRepickCooldown = 0;
-        data.searchPoint = pickRandomSearchPoint(data.lastSeenPos);
-    }
-
-    /**
-     * Чи досяг моб поточної точки пошуку (порогова відстань ~2 блоки).
-     */
-    private boolean hasReachedSearchPoint(Vec3 point) {
-        return this.mob.position().distanceToSqr(point) <= 4.0;
-    }
-
-    /**
-     * Обирає випадкову точку поблизу {@code center} у радіусі {@link #SEARCH_POINT_RADIUS}.
-     * Перевіряє, що точка реально досяжна для навігатора моба — якщо ні (прірва, закритий
-     * простір), повертає null: тоді моб лишається на місці до наступного репіку.
-     */
-    private Vec3 pickRandomSearchPoint(Vec3 center) {
-        if (center == null) {
-            return null;
+        if (data.searchGrid == null) {
+            // Не мало б статись (грід ставиться ще при вході в GOING_TO_LAST_SEEN) — про всяк
+            // випадок, щоб не впасти в NPE.
+            data.searchGrid = new SearchGrid();
         }
-        var random = this.mob.getRandom();
-        for (int attempt = 0; attempt < 8; attempt++) {
-            double angle = random.nextDouble() * 2.0 * Math.PI;
-            double radius = SEARCH_POINT_RADIUS * (0.4 + random.nextDouble() * 0.6);
-            double x = center.x + Math.cos(angle) * radius;
-            double z = center.z + Math.sin(angle) * radius;
-            // Шукаємо найближчий твердий блок по Y, щоб не класти точку в повітрі чи під землею.
-            net.minecraft.core.BlockPos blockPos = net.minecraft.core.BlockPos.containing(x, center.y, z);
-            // Перевіряємо, чи навігатор взагалі може побудувати шлях до цієї точки.
-            var path = this.mob.getNavigation().createPath(blockPos, 1);
-            if (path != null && path.canReach()) {
-                return new Vec3(x, center.y, z);
-            }
-        }
-        return null; // не знайшли досяжну точку за 8 спроб — повернемо null, тікаємо далі
+        data.searchPoint = data.searchGrid.tick(this.mob, this.mob.level().getGameTime());
     }
 
     /**
@@ -422,6 +403,7 @@ public class PursuitEnemyBehavior extends Goal {
         data.lastVisiblePos = null;
         data.lastSeenPos = null;
         data.searchPoint = null;
+        data.searchGrid = null;
         if (!supportsSearchBehavior) {
             this.mob.setSprinting(false);
         }
@@ -452,10 +434,17 @@ public class PursuitEnemyBehavior extends Goal {
          */
         Vec3 lastSeenPos = null;
         /**
-         * Поточна точка "никання" під час SEARCHING (оновлюється раз на SEARCH_REPICK_INTERVAL_TICKS).
+         * Поточна точка "никання" під час SEARCHING — надається SearchGrid.
          */
         Vec3 searchPoint = null;
         int searchTicksLeft = 0;
-        int searchRepickCooldown = 0;
+        /**
+         * Пер-мобовий диспетчер {@link SearchGrid} над спільним {@code GlobalSearchGrid}
+         * (без прив'язки до конкретного гравця — точки означають "тут нещодавно перевіряли на
+         * будь-якого ворога"). Ставиться ще при вході в GOING_TO_LAST_SEEN (легке фонове
+         * сканування вже під час підходу), повноцінно використовується для вибору точок у
+         * SEARCHING.
+         */
+        SearchGrid searchGrid = null;
     }
 }

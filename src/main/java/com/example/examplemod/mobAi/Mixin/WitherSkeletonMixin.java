@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterWitherSkeletonGoalAi;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.monster.WitherSkeleton;
@@ -21,6 +22,7 @@ public class WitherSkeletonMixin {
                 goal.getGoal() instanceof MeleeAttackGoal
         );
 
+        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
         mob.goalSelector.addGoal(1, new BetterWitherSkeletonGoalAi(mob, 1.0D));
     }
 }

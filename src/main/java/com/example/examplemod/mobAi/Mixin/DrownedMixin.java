@@ -1,5 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
+import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterDrownedGoalAi;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
@@ -22,6 +23,7 @@ public class DrownedMixin {
                         || goal.getGoal() instanceof MeleeAttackGoal
         );
 
+        drowned.goalSelector.addGoal(0, new PursuitEnemyBehavior(drowned, true, 1.0));
         drowned.goalSelector.addGoal(2, new BetterDrownedGoalAi(drowned, 1.0D, 40));
 
         drowned.setCanPickUpLoot(true);

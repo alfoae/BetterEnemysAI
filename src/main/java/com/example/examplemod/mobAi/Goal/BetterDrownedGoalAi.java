@@ -30,7 +30,6 @@ public class BetterDrownedGoalAi extends Goal {
         this.speedModifier = speedModifier;
         this.attackIntervalMin = attackIntervalMin;
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
-        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true, 1.0));
     }
 
     @Override
@@ -83,6 +82,24 @@ public class BetterDrownedGoalAi extends Goal {
         } else {
             --this.seeTime;
         }
+
+        // Немає прямої видимості — йдемо по пам'яті (chasePos), а не напряму до живої (можливо
+        // дуже далекої) позиції гравця. Інакше vanilla-навігатор не будує такий довгий шлях, і
+        // утопленик просто стоїть на місці, дійшовши до застиглої точки замість шукати далі.
+        Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
+        if (!canSee && chasePos != null) {
+            if (this.mob.isUsingItem()) {
+                this.mob.stopUsingItem(); // не тримаємо тризуб натягнутим, поки біжимо всліпу
+            }
+            this.mob.setSwimming(this.mob.isInWater());
+            double sprintSpeed = PursuitEnemyBehavior.getSprintSpeedModifier(this.mob);
+            this.mob.getNavigation().moveTo(chasePos.x, chasePos.y, chasePos.z, sprintSpeed);
+            this.mob.getLookControl().setLookAt(
+                    chasePos.x, chasePos.y + this.mob.getBbHeight() * 0.5, chasePos.z, 30.0F, 30.0F);
+            this.mob.setSprinting(true);
+            return;
+        }
+        this.mob.setSprinting(false);
 
         // ========================================================
         // РОЗДІЛЕННЯ ЛОГІКИ РУХУ (ВОДА / СУША)
