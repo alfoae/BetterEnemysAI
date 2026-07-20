@@ -27,8 +27,8 @@ public class ChangeEnemiesAttributes {
         // МОНСТРИ
         // ==========================================
         event.add(EntityType.ZOMBIE, Attributes.FOLLOW_RANGE, 30.0);
-        event.add(EntityType.HUSK, Attributes.FOLLOW_RANGE, 40.0);
-        event.add(EntityType.DROWNED, Attributes.FOLLOW_RANGE, 25.0);
+        event.add(EntityType.HUSK, Attributes.FOLLOW_RANGE, 30.0);
+        event.add(EntityType.DROWNED, Attributes.FOLLOW_RANGE, 30.0);
         event.add(EntityType.ZOMBIE_VILLAGER, Attributes.FOLLOW_RANGE, 30.0);
 
         event.add(EntityType.SKELETON, Attributes.FOLLOW_RANGE, 40.0);

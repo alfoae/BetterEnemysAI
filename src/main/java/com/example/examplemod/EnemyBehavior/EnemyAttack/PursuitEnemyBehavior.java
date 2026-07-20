@@ -52,7 +52,18 @@ public class PursuitEnemyBehavior extends Goal {
     /**
      * Тривалість "никання" біля останньої точки, перш ніж остаточне забуття.
      */
+    // Було 9999 * 20 (~2.78 год) — саме те тестове число, про яке попереджає коментар у
+    // SearchGrid (staleAfterTicks). Джавадок стану SEARCHING вище прямо каже "(15с)" — це
+    // й був задум, просто забули повернути після тестів.
     private static final int SEARCH_DURATION_TICKS = 15 * 20;
+    /**
+     * Запас поверх SEARCH_DURATION_TICKS, який передається в GlobalSearchGrid як staleAfterTicks
+     * (див. {@link SearchGrid#SearchGrid(long)}) — щоб позначки "прочекано" не протухали за
+     * кілька тіків ДО завершення того самого пошуку, який їх поставив (був баг: раніше
+     * GlobalSearchGrid тримав своє власне число, і воно розійшлось із цим після зміни
+     * SEARCH_DURATION_TICKS для тестів).
+     */
+    private static final long STALE_MARGIN_TICKS = 5 * 20;
     /**
      * Стан пам'яті прив'язаний до конкретного моба (WeakHashMap — записи самі зникають,
      * коли моб деспавнився/вивантажився і на нього більше немає сильних посилань).
@@ -119,7 +130,14 @@ public class PursuitEnemyBehavior extends Goal {
         return switch (data.state) {
             case CHASING -> data.trackedPlayer != null ? data.trackedPlayer.position() : null;
             case GOING_TO_LAST_SEEN -> data.lastSeenPos;
-            case SEARCHING -> data.searchPoint;
+            // +1 до Y: data.searchPoint — це підлога (з columnPoint/findFloorNear), а не висота
+            // ока. LookControl нижче (PursuitEnemyMeleeBehavior) додає ще +bbHeight*0.5 зверху
+            // на ЦЕ значення, але для floor-level точки цього замало: коли моб підходить
+            // впритул, горизонтальна відстань до цілі падає до ~0, а вертикальний перепад
+            // (висота ока моба мінус висота точки) лишається тим самим — тангенс кута нахилу
+            // росте до майже прямовисного "вниз". Піднявши БАЗУ на 1 блок ще до setLookAt,
+            // прибираємо основну частину цього ефекту саме на фінальному підході.
+            case SEARCHING -> data.searchPoint == null ? null : data.searchPoint.add(0, 1, 0);
             case FORGOTTEN -> null;
         };
     }
@@ -176,10 +194,16 @@ public class PursuitEnemyBehavior extends Goal {
      */
     private Player findCandidatePlayer() {
         MemoryData data = MEMORY.get(this.mob);
-        if (data != null && data.state == State.CHASING && data.trackedPlayer != null && data.trackedPlayer.isAlive()) {
+        // Додаємо перевірку isValidTarget
+        if (data != null && data.state == State.CHASING && isValidTarget(data.trackedPlayer)) {
             return data.trackedPlayer;
         }
-        return (this.mob.getTarget() instanceof Player player) ? player : null;
+        return (this.mob.getTarget() instanceof Player player && isValidTarget(player)) ? player : null;
+    }
+
+    private boolean isValidTarget(Player player) {
+        if (player == null) return false;
+        return !player.isSpectator() && !player.isCreative() && player.isAlive();
     }
 
     @Override
@@ -237,8 +261,11 @@ public class PursuitEnemyBehavior extends Goal {
             // легким фоновим скануванням встигає позначити щось по дорозі. Сам SearchGrid більше
             // не прив'язаний до конкретного гравця чи точки — він просто диспетчер над спільним
             // для ВСІХ мобів GlobalSearchGrid.
-            data.searchGrid = new SearchGrid();
-            debugMsg(player, String.format("[DEBUG] Доганяю ворога. Координати точки: %.1f %.1f %.1f",
+            if (data.searchGrid != null) {
+                data.searchGrid.discardDebugMarker(); // про всяк випадок - не мало б бути ненульовим тут
+            }
+            data.searchGrid = new SearchGrid(SEARCH_DURATION_TICKS + STALE_MARGIN_TICKS);
+            debugMsg(player, String.format("[DEBUG] Entering GOING_TO_LAST_SEEN. Point: %.1f %.1f %.1f",
                     fixedPos.x, fixedPos.y, fixedPos.z));
         }
     }
@@ -249,7 +276,10 @@ public class PursuitEnemyBehavior extends Goal {
      * що підтримують), або одразу FORGOTTEN.
      */
     private void tickGoingToLastSeen(MemoryData data) {
-        if (data.lastSeenPos == null) {
+        if (isValidTarget(data.trackedPlayer)) {
+            reinforceTarget(data.trackedPlayer);
+        } else if (data.trackedPlayer != null) {
+            // Якщо гравець перейшов у креатив/спектратор прямо в процесі підходу
             forgetInternal(data);
             return;
         }
@@ -275,7 +305,7 @@ public class PursuitEnemyBehavior extends Goal {
         if (distToPoint <= Math.sqrt(DRAW_BOWSTRING_DISTANCE_SQ) && data.trackedPlayer != null
                 && this.mob.tickCount % 20 == 0) {
             debugMsg(data.trackedPlayer, String.format(
-                    "[DEBUG] Готуюсь до вистрілу. Відстань до точки: %.1f блоків", distToPoint));
+                    "[DEBUG] Drawing bowstring. Distance to point: %.1f blocks", distToPoint));
         }
 
         double reachThresholdSq = 4.0; // ~2 блоки
@@ -316,11 +346,14 @@ public class PursuitEnemyBehavior extends Goal {
                     : (data.trackedPlayer != null ? data.trackedPlayer : null);
             if (debugPlayer != null) {
                 int secsLeft = data.searchTicksLeft / 20;
-                debugMsg(debugPlayer, "[DEBUG] Шукаю ціль. Залишилось: " + secsLeft + "с");
+                debugMsg(debugPlayer, "[DEBUG] Still SEARCHING. Time left: " + secsLeft + "s");
             }
         }
 
         if (data.searchGrid == null) {
+            if (data.trackedPlayer != null) {
+                debugMsg(data.trackedPlayer, "[DEBUG] Forgetting: searchGrid was null in tickSearching");
+            }
             forgetInternal(data); // про всяк випадок, не мало б статись
             return;
         }
@@ -331,6 +364,9 @@ public class PursuitEnemyBehavior extends Goal {
         if (newPoint == null) {
             // Вся зона в межах FOLLOW_RANGE вже оглянута напряму, гравця нема — нема сенсу
             // чекати до кінця таймера, здаємось одразу.
+            if (data.trackedPlayer != null) {
+                debugMsg(data.trackedPlayer, "[DEBUG] Forgetting: no reachable frontier point found");
+            }
             forgetInternal(data);
             return;
         }
@@ -340,7 +376,7 @@ public class PursuitEnemyBehavior extends Goal {
             Player debugPlayer = (this.mob.getTarget() instanceof Player p) ? p
                     : (data.trackedPlayer != null ? data.trackedPlayer : null);
             if (debugPlayer != null) {
-                debugMsg(debugPlayer, String.format("[DEBUG] Шукаю ціль. Координати вибраної точки: %.1f %.1f %.1f",
+                debugMsg(debugPlayer, String.format("[DEBUG] New search point: %.1f %.1f %.1f",
                         newPoint.x, newPoint.y, newPoint.z));
             }
         }
@@ -355,7 +391,7 @@ public class PursuitEnemyBehavior extends Goal {
     private boolean tryResumeChasing(MemoryData data) {
         Player nearbyPlayer = (this.mob.getTarget() instanceof Player player) ? player
                 : (data.trackedPlayer != null ? data.trackedPlayer : null);
-        if (nearbyPlayer == null || !nearbyPlayer.isAlive()) {
+        if (!isValidTarget(nearbyPlayer)) {
             return false;
         }
         double followRange = this.mob.getAttributeValue(Attributes.FOLLOW_RANGE);
@@ -365,10 +401,14 @@ public class PursuitEnemyBehavior extends Goal {
         if (!this.mob.getSensing().hasLineOfSight(nearbyPlayer)) {
             return false;
         }
+        debugMsg(nearbyPlayer, "[DEBUG] Resumed CHASING (regained line of sight)");
         data.state = State.CHASING;
         data.trackedPlayer = nearbyPlayer;
         data.lastSeenPos = null;
         data.searchPoint = null;
+        if (data.searchGrid != null) {
+            data.searchGrid.discardDebugMarker();
+        }
         data.searchGrid = null;
         reinforceTarget(nearbyPlayer);
         return true;
@@ -382,9 +422,20 @@ public class PursuitEnemyBehavior extends Goal {
         if (data.searchGrid == null) {
             // Не мало б статись (грід ставиться ще при вході в GOING_TO_LAST_SEEN) — про всяк
             // випадок, щоб не впасти в NPE.
-            data.searchGrid = new SearchGrid();
+            data.searchGrid = new SearchGrid(SEARCH_DURATION_TICKS + STALE_MARGIN_TICKS);
         }
         data.searchPoint = data.searchGrid.tick(this.mob, this.mob.level().getGameTime());
+        // DEBUG: миттєвий лог старту SEARCHING - не чекаємо секунду до першого періодичного
+        // повідомлення, щоб бачити навіть дуже коротке перебування в цьому стані.
+        if (data.trackedPlayer != null) {
+            if (data.searchPoint != null) {
+                debugMsg(data.trackedPlayer, String.format(
+                        "[DEBUG] SEARCHING started. First point: %.1f %.1f %.1f",
+                        data.searchPoint.x, data.searchPoint.y, data.searchPoint.z));
+            } else {
+                debugMsg(data.trackedPlayer, "[DEBUG] SEARCHING started but tick() returned null immediately");
+            }
+        }
     }
 
     /**
@@ -403,6 +454,9 @@ public class PursuitEnemyBehavior extends Goal {
         data.lastVisiblePos = null;
         data.lastSeenPos = null;
         data.searchPoint = null;
+        if (data.searchGrid != null) {
+            data.searchGrid.discardDebugMarker();
+        }
         data.searchGrid = null;
         if (!supportsSearchBehavior) {
             this.mob.setSprinting(false);

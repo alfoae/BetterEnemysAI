@@ -13,10 +13,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * гравців одночасно.
  * <p>
  * "Непрочекана" — це просто ВІДСУТНІСТЬ запису (лінива структура, не зберігаємо нічого для
- * порожньої більшості світу). Запис вважається чинним лише {@link #STALE_AFTER_TICKS} тіків без
+ * порожньої більшості світу). Запис вважається чинним лише {@code staleAfterTicks} тіків без
  * оновлення — застарілі протухають ЛІНИВО (перевіряються й видаляються прямо під час читання,
- * окремого фонового прибирання не треба): "конкретна ділянка не оновлюється протягом часу режиму
- * пошуку — ділянка видаляється" виконується автоматично, без явного стеження за ділянками.
+ * окремого фонового прибирання не треба). {@code staleAfterTicks} свідомо НЕ захардкожений тут:
+ * раніше було своє окреме число ("той самий час, що й SEARCH_DURATION_TICKS" — але тільки в
+ * коментарі, не насправді), і коли SEARCH_DURATION_TICKS в PursuitEnemyBehavior зростав, ці два
+ * числа розходились — позначки протухали ще ДО завершення того самого пошуку, який їх поставив,
+ * і моб ходив по колу тими самими "вже прочеканими" клітинками. Тепер виклик сам передає, скільки
+ * тіків триває його пошук — єдине джерело правди замість двох чисел, які треба синхронізувати
+ * вручну.
  * <p>
  * Розділено по вимірах (Overworld/Nether/End) — координати з різних вимірів можуть числово
  * збігатися, але фізично це геть різні місця.
@@ -26,11 +31,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * виключно з {@link SearchGrid}, а той — виключно з відповідних гілок PursuitEnemyBehavior.
  */
 public final class GlobalSearchGrid {
-
-    /**
-     * Скільки тіків запис лишається дійсним без оновлення, перш ніж вважається застарілим.
-     */
-    private static final long STALE_AFTER_TICKS = 15 * 20; // той самий час, що й SEARCH_DURATION_TICKS
 
     private static final Map<ResourceKey<Level>, Map<Long, Long>> BY_DIMENSION = new ConcurrentHashMap<>();
 
@@ -45,13 +45,18 @@ public final class GlobalSearchGrid {
         return ((long) x << 32) ^ (z & 0xFFFFFFFFL);
     }
 
-    public static boolean isChecked(Level level, int x, int z, long currentGameTime) {
+    /**
+     * @param staleAfterTicks скільки тіків запис лишається дійсним без оновлення. Має бути НЕ
+     *                        менше за тривалість пошуку, що його читає — інакше позначки протухнуть
+     *                        просто в процесі того самого пошуку.
+     */
+    public static boolean isChecked(Level level, int x, int z, long currentGameTime, long staleAfterTicks) {
         Map<Long, Long> map = forDimension(level);
         Long touched = map.get(key(x, z));
         if (touched == null) {
             return false;
         }
-        if (currentGameTime - touched > STALE_AFTER_TICKS) {
+        if (currentGameTime - touched > staleAfterTicks) {
             map.remove(key(x, z)); // застаріло - вважаємо неперевіреним і забуваємо назавжди
             return false;
         }
