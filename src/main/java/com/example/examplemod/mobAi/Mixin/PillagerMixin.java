@@ -3,6 +3,7 @@ package com.example.examplemod.mobAi.Mixin;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyMeleeBehavior;
 import com.example.examplemod.mobAi.Goal.BetterPillagerVindicatorGoalAi;
+import com.example.examplemod.mobAi.Goal.IdleCrossbowGoal;
 import com.example.examplemod.mobAi.Goal.SwapWeaponGoal;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.monster.AbstractIllager;
@@ -33,6 +34,7 @@ public class PillagerMixin {
         mob.goalSelector.addGoal(2, new BetterPillagerVindicatorGoalAi(mob));
         mob.goalSelector.addGoal(3, new PursuitEnemyMeleeBehavior(mob, 1.2D,
                 m -> m.getMainHandItem().is(Items.IRON_AXE)));
+        mob.goalSelector.addGoal(4, new IdleCrossbowGoal(mob, Items.IRON_AXE));
     }
 
     @Inject(method = "getArmPose", at = @At("HEAD"), cancellable = true)

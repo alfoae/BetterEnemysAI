@@ -3,6 +3,7 @@ package com.example.examplemod.mobAi.Mixin;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterZombieGoalAi;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
+import net.minecraft.world.entity.monster.Drowned;
 import net.minecraft.world.entity.monster.Zombie;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,6 +17,19 @@ public class ZombieMixin {
     private void addBetterAI(CallbackInfo ci) {
         Zombie mob = (Zombie) (Object) this;
 
+        // ОБОВ'ЯЗКОВО, не опціонально: Drowned extends Zombie у ванілі, тож цей інжект у
+        // registerGoals() спрацьовує і для нього — а це ЗАВЖДИ ламає DrownedMixin, незалежно
+        // від пріоритету BetterZombieGoalAi. Причина не в конфлікті прапорців (це окрема,
+        // другорядна проблема) — а в тому, що registerGoals() виконується РАНІШЕ за
+        // populateDefaultEquipmentSlots(), тож коли доходить черга до DrownedMixin, його гард
+        // від подвійної реєстрації бачить PursuitEnemyBehavior, щойно доданий ЗВІДСИ, і
+        // пропускає ввесь свій блок — разом із видаленням ванільного Trident-Goal і додаванням
+        // BetterDrownedGoalAi. Результат: дровнед лишається на чистій ванілі (без prediction,
+        // без getChasePosition) незалежно від того, яку цифру пріоритету поставити нижче.
+        if (mob instanceof Drowned) {
+            return;
+        }
+
         // Ванільний ZombieAttackGoal (public, extends MeleeAttackGoal) — прибираємо,
         // щоб не конфліктував по флагах MOVE/LOOK з PursuitEnemyMeleeBehavior.
         mob.goalSelector.getAvailableGoals().removeIf(goal ->
@@ -23,6 +37,6 @@ public class ZombieMixin {
         );
 
         mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
-        mob.goalSelector.addGoal(1, new BetterZombieGoalAi(mob, 1.0D));
+        mob.goalSelector.addGoal(2, new BetterZombieGoalAi(mob, 1.0D));
     }
 }

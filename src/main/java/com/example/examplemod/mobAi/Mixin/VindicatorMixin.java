@@ -3,6 +3,7 @@ package com.example.examplemod.mobAi.Mixin;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyMeleeBehavior;
 import com.example.examplemod.mobAi.Goal.BetterPillagerVindicatorGoalAi;
+import com.example.examplemod.mobAi.Goal.IdleCrossbowGoal;
 import com.example.examplemod.mobAi.Goal.SwapWeaponGoal;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
@@ -38,6 +39,7 @@ public abstract class VindicatorMixin extends AbstractIllager {
         this.goalSelector.addGoal(2, new BetterPillagerVindicatorGoalAi(mob));
         this.goalSelector.addGoal(3, new PursuitEnemyMeleeBehavior(mob, 1.2D,
                 m -> m.getMainHandItem().is(Items.IRON_AXE)));
+        this.goalSelector.addGoal(4, new IdleCrossbowGoal(mob, Items.IRON_AXE));
     }
 
     @Override

@@ -1,11 +1,11 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
 import com.example.examplemod.utils.AdvancedAimMath;
 import com.example.examplemod.utils.PlayerVelocityTracker;
 import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.behavior.Behavior;
@@ -28,6 +28,13 @@ import java.util.Map;
  * натягує арбалет -> тримає заряджений -> стріляє ТІЛЬКИ коли лінія вогню
  * (з урахуванням товщини стріли) вільна від союзників по фракції.
  * Якщо союзник заважає — піглін НЕ скидає заряд, просто чекає далі з націленим арбалетом.
+ * <p>
+ * РУХ ТУТ НЕ ВЕДЕМО — раніше тут був прямий {@code navigation.moveTo(...)} для випадку
+ * {@code !canSee}, який паралельно з {@code PursuitBrainBridgeGoal} (веде рух через
+ * {@code WALK_TARGET}) змагався за контроль над навігацією/спринтом того самого тіку — той
+ * самий клас конфлікту, що й був із ванільною {@code SetWalkTargetFromAttackTargetIfTargetOutOfReach}.
+ * Тепер рух і спринт — виключно відповідальність {@code PursuitBrainBridgeGoal}; тут лишається
+ * тільки "не намагайся стріляти по тому, кого не бачиш".
  */
 public class BetterPiglinGoalAi extends Behavior<Piglin> {
 
@@ -45,12 +52,13 @@ public class BetterPiglinGoalAi extends Behavior<Piglin> {
 
     @Override
     protected boolean checkExtraStartConditions(ServerLevel level, Piglin piglin) {
-        return piglin.getMainHandItem().is(Items.CROSSBOW);
+        return !piglin.isBaby() && piglin.getMainHandItem().is(Items.CROSSBOW);
     }
 
     @Override
     protected boolean canStillUse(ServerLevel level, Piglin piglin, long gameTime) {
-        return piglin.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET)
+        return !piglin.isBaby()
+                && piglin.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET)
                 && piglin.getMainHandItem().is(Items.CROSSBOW);
     }
 
@@ -62,6 +70,7 @@ public class BetterPiglinGoalAi extends Behavior<Piglin> {
     @Override
     protected void stop(ServerLevel level, Piglin piglin, long gameTime) {
         piglin.stopUsingItem();
+        piglin.setChargingCrossbow(false); // про всяк випадок, якщо перервано саме під час натягу (state==1)
         this.state = 0;
     }
 
@@ -70,18 +79,12 @@ public class BetterPiglinGoalAi extends Behavior<Piglin> {
         LivingEntity target = piglin.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET).orElse(null);
         if (target == null) return;
 
-        // Якщо немає прямої видимості — йдемо до точки переслідування (застигла точка або
-        // жива позиція крізь стіни) замість того щоб стояти і чекати.
+        // Без прямої видимості нема сенсу намагатись стріляти/натягувати - PursuitBrainBridgeGoal
+        // і так веде пігліна до chasePos. Просто чекаємо, поки видимість не повернеться.
         boolean canSee = piglin.getSensing().hasLineOfSight(target);
-        net.minecraft.world.phys.Vec3 chasePos =
-                PursuitEnemyBehavior.getChasePosition(piglin);
-        if (!canSee && chasePos != null) {
-            double sprintSpeed = PursuitEnemyBehavior.getSprintSpeedModifier(piglin);
-            piglin.getNavigation().moveTo(chasePos.x, chasePos.y, chasePos.z, sprintSpeed);
-            piglin.setSprinting(true);
+        if (!canSee) {
             return;
         }
-        piglin.setSprinting(false);
 
         piglin.getLookControl().setLookAt(target, 30.0F, 30.0F);
         ItemStack crossbow = piglin.getMainHandItem();
@@ -94,7 +97,9 @@ public class BetterPiglinGoalAi extends Behavior<Piglin> {
                 this.attackTimer = 5;
                 piglin.setAggressive(true);
             } else {
-                piglin.startUsingItem(piglin.getUsedItemHand());
+                piglin.startUsingItem(InteractionHand.MAIN_HAND);
+                piglin.setChargingCrossbow(true); // САМЕ цей прапорець керує getArmPose() у Piglin,
+                // isUsingItem() сам по собі на позу не впливає
                 piglin.setAggressive(true);
                 this.attackTimer = CHARGE_TIME;
                 this.state = 1;
@@ -102,8 +107,14 @@ public class BetterPiglinGoalAi extends Behavior<Piglin> {
         } else if (state == 1) {
             this.attackTimer--;
             if (this.attackTimer <= 0) {
-                crossbow.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.of(new ItemStack(Items.ARROW)));
+                // Копія + setItemInHand, а не мутація на місці: синхронізація екіпіровки до
+                // клієнтів (для правильної анімації натягу/підйому) інакше могла не помітити
+                // зміну CHARGED_PROJECTILES на ТОМУ Ж об'єкті ItemStack.
+                ItemStack chargedCrossbow = crossbow.copy();
+                chargedCrossbow.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.of(new ItemStack(Items.ARROW)));
+                piglin.setItemInHand(InteractionHand.MAIN_HAND, chargedCrossbow);
                 piglin.stopUsingItem();
+                piglin.setChargingCrossbow(false); // натяг завершено - тепер просто тримає заряджений
                 this.state = 2;
                 this.attackTimer = 5;
             }
@@ -136,8 +147,12 @@ public class BetterPiglinGoalAi extends Behavior<Piglin> {
                 }
 
                 shootWithPrediction(piglin, target, aim);
+                piglin.onCrossbowAttackPerformed(); // частина контракту CrossbowAttackMob
 
-                crossbow.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.EMPTY);
+                // Та сама причина, що й вище: копія + setItemInHand для надійної синхронізації.
+                ItemStack emptiedCrossbow = crossbow.copy();
+                emptiedCrossbow.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.EMPTY);
+                piglin.setItemInHand(InteractionHand.MAIN_HAND, emptiedCrossbow);
 
                 // ВАЖЛИВО: переходимо в окремий стан "кулдаун", а не одразу в state=0 —
                 // інакше на наступному тіку state==0 побачить незаряджений арбалет і одразу

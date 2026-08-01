@@ -13,6 +13,7 @@
     "IronGolemMixin",
     "MobWeaponStorageMixin",
     "PiglinBruteMixin",
+    "PiglinGoalMixin",
     "PiglinMixin",
     "PillagerMixin",
     "SkeletonMixin",

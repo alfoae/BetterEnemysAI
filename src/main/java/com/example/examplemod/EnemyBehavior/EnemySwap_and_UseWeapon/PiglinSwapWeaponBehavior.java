@@ -15,15 +15,22 @@ import java.util.Map;
 
 public class PiglinSwapWeaponBehavior extends Behavior<Piglin> {
 
-    private static final float MELEE_DISTANCE = 5.0F;
+    private static final float SWITCH_TO_MELEE_DISTANCE = 4.0F;  // ближче цієї - точно меч
+    private static final float SWITCH_TO_RANGED_DISTANCE = 6.0F; // далі цієї - точно арбалет
 
     public PiglinSwapWeaponBehavior() {
         super(Map.of(MemoryModuleType.ATTACK_TARGET, MemoryStatus.VALUE_PRESENT));
     }
 
     @Override
+    protected boolean checkExtraStartConditions(ServerLevel level, Piglin piglin) {
+        // Блокуємо старт поведінки, якщо це дитинча
+        return !piglin.isBaby();
+    }
+
+    @Override
     protected boolean canStillUse(ServerLevel level, Piglin piglin, long gameTime) {
-        return piglin.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET);
+        return !piglin.isBaby() && piglin.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET);
     }
 
     @Override
@@ -37,6 +44,11 @@ public class PiglinSwapWeaponBehavior extends Behavior<Piglin> {
     }
 
     private void swapWeaponIfNeeded(Piglin piglin) {
+        // Додатковий запобіжник від видачі зброї малятам
+        if (piglin.isBaby()) {
+            return;
+        }
+
         LivingEntity target = piglin.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET).orElse(null);
 
         if (target != null) {
@@ -45,7 +57,7 @@ public class PiglinSwapWeaponBehavior extends Behavior<Piglin> {
             ItemStack currentHand = piglin.getMainHandItem();
 
             // 1. Пріоритет - БЛИЖНІЙ БІЙ
-            if (distance <= MELEE_DISTANCE) {
+            if (distance <= SWITCH_TO_MELEE_DISTANCE) {
                 if (!currentHand.is(Items.GOLDEN_SWORD)) {
                     // Зберігаємо арбалет
                     if (currentHand.is(Items.CROSSBOW)) {
@@ -56,11 +68,13 @@ public class PiglinSwapWeaponBehavior extends Behavior<Piglin> {
                     ItemStack storedMelee = storage.getStoredMelee();
                     if (storedMelee.isEmpty()) storedMelee = new ItemStack(Items.GOLDEN_SWORD);
 
+                    piglin.stopUsingItem();
+                    piglin.setChargingCrossbow(false);
                     piglin.setItemInHand(InteractionHand.MAIN_HAND, storedMelee);
                 }
             }
-            // 2. ДАЛЬНІЙ БІЙ (якщо дистанція більша за ближню)
-            else {
+            // 2. ДАЛЬНІЙ БІЙ
+            else if (distance >= SWITCH_TO_RANGED_DISTANCE) {
                 if (!currentHand.is(Items.CROSSBOW)) {
                     // Зберігаємо меч
                     if (currentHand.is(Items.GOLDEN_SWORD)) {
@@ -71,6 +85,7 @@ public class PiglinSwapWeaponBehavior extends Behavior<Piglin> {
                     ItemStack storedRanged = storage.getStoredRanged();
                     if (storedRanged.isEmpty()) storedRanged = new ItemStack(Items.CROSSBOW);
 
+                    piglin.stopUsingItem();
                     piglin.setItemInHand(InteractionHand.MAIN_HAND, storedRanged);
                 }
             }

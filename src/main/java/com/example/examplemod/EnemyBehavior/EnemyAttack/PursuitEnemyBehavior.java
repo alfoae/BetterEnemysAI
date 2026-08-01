@@ -20,7 +20,14 @@ import java.util.WeakHashMap;
  *       моба. Незалежно від того, чи є пряма видимість (навіть за стіною) — моб переслідує
  *       ЖИВУ позицію гравця крізь стіни. Лук/арбалет можуть тягнутись (анімація натягу), але
  *       фактичний виліт снаряда лишається заблокованим звичайним canSee — за це відповідає
- *       {@link #isMemoryChasing(Mob)}, який треба перевіряти поряд з canSee в Goal-ах стрільби.</li>
+ *       {@link #isMemoryChasing(Mob)}, який треба перевіряти поряд з canSee в Goal-ах стрільби.
+ *       У ЦЬОМУ (і ТІЛЬКИ цьому) стані щотіку перевіряється, чи нема ІНШОГО гравця, який зараз
+ *       і БЛИЖЧЕ за поточного відстежуваного, і видимий мобу напряму (canSee, тобто не за
+ *       стіною) — якщо є, ціль миттєво перемикається на нього, див. {@link #findCloserVisiblePlayer}.
+ *       Гравець за стіною НІКОЛИ не перехоплює агро цим шляхом, навіть якщо геометрично ближче:
+ *       "найближчий" тут рахується лише серед видимих напряму. GOING_TO_LAST_SEEN і SEARCHING
+ *       нижче цю перевірку не викликають узагалі — перемикання цілі стосується виключно
+ *       "режиму атаки", коли моб реально йде бити гравця в межах радіуса.</li>
  *   <li><b>GOING_TO_LAST_SEEN</b> — гравець вийшов за межі ПОВНОГО FOLLOW_RANGE. Моб іде до
  *       ЗАСТИГЛОЇ точки — там, де гравець був у момент виходу (позиція більше НЕ оновлюється
  *       живою позицією гравця).</li>
@@ -117,6 +124,24 @@ public class PursuitEnemyBehavior extends Goal {
     }
 
     /**
+     * Гравець, якого зараз реально тримає ця система пам'яті (тобто {@code data.trackedPlayer}),
+     * АБО {@code null}, якщо системи немає чи вона вже в стані FORGOTTEN (тобто "забула" — далі
+     * рішення повністю за звичайним ванільним/Brain-таргетингом мобу).
+     * <p>
+     * Призначення: для мобів, чия БОЙОВА логіка керується НЕ через {@code mob.getTarget()}
+     * напряму (Brain-мобів на кшталт Piglin, де реальну ціль тримає memory-модуль
+     * {@code ATTACK_TARGET}, а {@code setTarget()} сам по собі бій не перемикає) — щось ЗОВНІ
+     * (напр. {@code PursuitBrainBridgeGoal}) повинно явно перечитати це значення і самостійно
+     * синхронізувати його у Brain. Для звичайних Goal-based мобів цей метод не потрібен:
+     * {@code reinforceTarget} всередині цього ж класу вже підтримує {@code mob.getTarget()}
+     * в актуальному стані.
+     */
+    public static Player getTrackedPlayer(Mob mob) {
+        MemoryData data = MEMORY.get(mob);
+        return (data != null && data.state != State.FORGOTTEN) ? data.trackedPlayer : null;
+    }
+
+    /**
      * Точка, до якої моб має рухатись цього тіку, ігноруючи відсутність прямої видимості:
      * жива позиція гравця (CHASING), застигла остання відома точка (GOING_TO_LAST_SEEN) або
      * поточна точка "никання" (SEARCHING). Повертає null, якщо система не активна — тоді рух
@@ -206,6 +231,41 @@ public class PursuitEnemyBehavior extends Goal {
         return !player.isSpectator() && !player.isCreative() && player.isAlive();
     }
 
+    /**
+     * Шукає серед УСІХ гравців у вимірі моба того, хто ЗАРАЗ БЛИЖЧЕ до моба, ніж currentTracked,
+     * і при цьому моб його реально бачить напряму ({@code Sensing.hasLineOfSight}, тобто НЕ за
+     * стіною). Викликається ЛИШЕ зі стану CHASING (див. {@link #tick()}) — саме це і є "режим
+     * атаки", де діє правило "агро на найближчого", але тільки серед видимих напряму: гравець за
+     * стіною ніколи не перехоплює агро цим шляхом, навіть якщо геометрично ближче за трекнутого.
+     * <p>
+     * followRangeSq приймається ззовні, а не рахується тут заново: currentTracked вже гарантовано
+     * в його межах (це умова входу в CHASING), і кандидат теж повинен туди влізти — гравець
+     * далі за FOLLOW_RANGE не повинен красти агро, навіть якщо він єдиний видимий напряму.
+     *
+     * @return найближчого підхожого гравця, ЯКЩО він строго ближче за currentTracked; {@code null},
+     * якщо кращого кандидата нема (currentTracked і сам лишається найближчим видимим, або
+     * єдиним видимим взагалі) — тоді ціль лишається без змін.
+     */
+    private Player findCloserVisiblePlayer(Player currentTracked, double followRangeSq) {
+        double bestDistSq = this.mob.distanceToSqr(currentTracked);
+        Player best = null;
+        for (Player candidate : this.mob.level().players()) {
+            if (candidate == currentTracked || !isValidTarget(candidate)) {
+                continue;
+            }
+            double distSq = this.mob.distanceToSqr(candidate);
+            if (distSq >= bestDistSq || distSq > followRangeSq) {
+                continue; // не ближче за поточного лідера АБО поза радіусом атаки моба
+            }
+            if (!this.mob.getSensing().hasLineOfSight(candidate)) {
+                continue; // за стіною (чи будь-якою іншою перепоною) — не може перехопити агро
+            }
+            best = candidate;
+            bestDistSq = distSq;
+        }
+        return best;
+    }
+
     @Override
     public void tick() {
         MemoryData data = MEMORY.computeIfAbsent(this.mob, m -> new MemoryData());
@@ -235,9 +295,23 @@ public class PursuitEnemyBehavior extends Goal {
         data.trackedPlayer = player;
 
         double followRange = this.mob.getAttributeValue(Attributes.FOLLOW_RANGE);
+        double followRangeSq = followRange * followRange;
         double distSq = this.mob.distanceToSqr(player);
 
-        if (distSq <= followRange * followRange) {
+        if (distSq <= followRangeSq) {
+            // "Режим атаки" — і ТІЛЬКИ він: перш ніж підтвердити ціль, перевіряємо, чи не
+            // з'явився БЛИЖЧИЙ гравець, якого моб реально бачить напряму (не за стіною). Якщо
+            // так — перемикаємось на нього ще до входу в CHASING нижче, щоб усі гілки далі
+            // (reinforceTarget, lastVisiblePos тощо) відразу відпрацювали для НОВОЇ цілі.
+            Player closerVisible = findCloserVisiblePlayer(player, followRangeSq);
+            if (closerVisible != null) {
+                debugMsg(closerVisible, String.format(
+                        "[DEBUG] Re-aggro: closer visible player stole aggro (%.1f -> %.1f blocks)",
+                        Math.sqrt(distSq), Math.sqrt(this.mob.distanceToSqr(closerVisible))));
+                player = closerVisible;
+                distSq = this.mob.distanceToSqr(player);
+            }
+
             // У межах повного радіуса — переслідуємо живу позицію крізь стіни.
             data.state = State.CHASING;
             data.trackedPlayer = player;
