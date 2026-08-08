@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build;
 
 import com.example.examplemod.Config;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
@@ -22,12 +22,12 @@ import net.minecraft.world.phys.Vec3;
  * Різняться лише тим, ЩО роблять, коли шлях туди заблокований: копання прибирає суцільну
  * перепону, будівництво заповнює яму чи піднімається вгору.
  */
-public final class EnemyBrake_N_BuildUtils {
+public final class EnemyBreak_N_BuildUtils {
 
     public static final int SEARCH_XZ_RADIUS = 8;
     public static final int SEARCH_Y_RADIUS = 3;
 
-    private EnemyBrake_N_BuildUtils() {
+    private EnemyBreak_N_BuildUtils() {
     }
 
     /**

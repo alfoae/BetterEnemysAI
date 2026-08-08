@@ -1,8 +1,8 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build;
 
 import com.example.examplemod.Config;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
-import com.example.examplemod.event.EnemyBrake_N_BuildEvents;
+import com.example.examplemod.event.EnemyBreak_N_BuildEvents;
 import com.example.examplemod.utils.IMobBlockStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -28,7 +28,7 @@ import java.util.EnumSet;
  * позиц≥Їю, а натом≥сть моб пробивавс€ до найближчого природного "кишен≥" на тому ж р≥вн≥.
  * <p>
  * Ўвидк≥сть лам анн€ Ч {@link MiningTierData#getTicksPerBlock()}, глобальний т≥р усього сервера.
- * «ламан≥ блоки йдуть у {@link IMobBlockStorage} мобу (дроп при смерт≥ Ч {@link EnemyBrake_N_BuildEvents}).
+ * «ламан≥ блоки йдуть у {@link IMobBlockStorage} мобу (дроп при смерт≥ Ч {@link EnemyBreak_N_BuildEvents}).
  * ѕропускаЇ блоки з block entity (скрин≥, спавнери тощо) Ч св≥доме обмеженн€, не було в
  * “« €вно, але ламати гравцев≥ скриню вигл€даЇ €к €вний переб≥р.
  */

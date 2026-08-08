@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build;
 
 import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
 import net.minecraft.core.BlockPos;
@@ -12,13 +12,13 @@ import java.util.EnumSet;
 
 /**
  * навігація заблокована, але причина НЕ суцільна стіна (це {@link DigThroughWallsGoal}), а
- * відсутність опори під ногами. Спільний гейт і "куди йдемо" — {@link EnemyBrake_N_BuildUtils}.
+ * відсутність опори під ногами. Спільний гейт і "куди йдемо" — {@link EnemyBreak_N_BuildUtils}.
  * <p>
  * Два режими, обирається щотіку заново залежно від різниці висот з ціллю:
  * <ul>
  *   <li><b>Climb</b> (ціль значно вище — {@link #CLIMB_HEIGHT_THRESHOLD}) — ставить блок під
  *       ноги і стрибає, "піларить" вгору. Якщо щось заважає стрибку (стеля над головою) —
- *       спочатку ламає його ({@link EnemyBrake_N_BuildUtils#isBreakable}/{@link EnemyBrake_N_BuildUtils#breakBlock}),
+ *       спочатку ламає його ({@link EnemyBreak_N_BuildUtils#isBreakable}/{@link EnemyBreak_N_BuildUtils#breakBlock}),
  *       саме як просив користувач: "якщо перекриває блок — ламає".</li>
  *   <li><b>Bridge</b> (ціль приблизно на тій самій висоті, але попереду яма) — кладе блок під
  *       наступний горизонтальний крок, щоб з'явилась опора, і йде далі.</li>
@@ -49,20 +49,20 @@ public class BuildPathGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (!EnemyBrake_N_BuildUtils.canOperate(this.mob)) return false;
+        if (!EnemyBreak_N_BuildUtils.canOperate(this.mob)) return false;
         if (!(this.mob.level() instanceof ServerLevel level)) return false;
 
         Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
         if (chasePos == null) return false;
-        if (!EnemyBrake_N_BuildUtils.isPathBlocked(this.mob, chasePos)) return false;
+        if (!EnemyBreak_N_BuildUtils.isPathBlocked(this.mob, chasePos)) return false;
 
-        BlockPos target = EnemyBrake_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
+        BlockPos target = EnemyBreak_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
         return needsClimb(target) || needsBridge(level, target);
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (!EnemyBrake_N_BuildUtils.canOperate(this.mob)) return false;
+        if (!EnemyBreak_N_BuildUtils.canOperate(this.mob)) return false;
         return this.buildTarget != null;
     }
 
@@ -90,13 +90,13 @@ public class BuildPathGoal extends Goal {
         }
 
         if (--this.retargetTimer <= 0 || this.buildTarget == null) {
-            this.buildTarget = EnemyBrake_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
+            this.buildTarget = EnemyBreak_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
             this.retargetTimer = RETARGET_INTERVAL_TICKS;
         }
 
         if (--this.stuckCheckTimer <= 0) {
             this.stuckCheckTimer = STUCK_CHECK_INTERVAL_TICKS;
-            if (!EnemyBrake_N_BuildUtils.isPathBlocked(this.mob, chasePos)) {
+            if (!EnemyBreak_N_BuildUtils.isPathBlocked(this.mob, chasePos)) {
                 this.buildTarget = null;
                 return;
             }
@@ -131,8 +131,8 @@ public class BuildPathGoal extends Goal {
      * Яма: наступний крок сам НЕ суцільний (інакше це DigThroughWallsGoal), і під ним теж немає опори.
      */
     private boolean needsBridge(Level level, BlockPos target) {
-        BlockPos step = EnemyBrake_N_BuildUtils.nextHorizontalStep(this.mob, target);
-        if (EnemyBrake_N_BuildUtils.isBreakable(level, step)) return false; // стіна - не наша справа
+        BlockPos step = EnemyBreak_N_BuildUtils.nextHorizontalStep(this.mob, target);
+        if (EnemyBreak_N_BuildUtils.isBreakable(level, step)) return false; // стіна - не наша справа
         return !level.getBlockState(step.below()).isSolid();
     }
 
@@ -142,25 +142,25 @@ public class BuildPathGoal extends Goal {
 
         // Спочатку прибираємо перепону над головою, якщо є ("якщо перекриває блок - ламає") -
         // інакше стрибок все одно вдариться об стелю і нічого не дасть.
-        if (EnemyBrake_N_BuildUtils.isBreakable(level, overhead)) {
-            EnemyBrake_N_BuildUtils.breakBlock(level, overhead, this.mob);
+        if (EnemyBreak_N_BuildUtils.isBreakable(level, overhead)) {
+            EnemyBreak_N_BuildUtils.breakBlock(level, overhead, this.mob);
             return;
         }
 
         BlockPos below = feet.below();
         if (!level.getBlockState(below).isSolid()) {
-            EnemyBrake_N_BuildUtils.placeBlock(level, below);
+            EnemyBreak_N_BuildUtils.placeBlock(level, below);
         }
 
         this.mob.getJumpControl().jump();
     }
 
     private void handleBridge(ServerLevel level) {
-        BlockPos step = EnemyBrake_N_BuildUtils.nextHorizontalStep(this.mob, this.buildTarget);
+        BlockPos step = EnemyBreak_N_BuildUtils.nextHorizontalStep(this.mob, this.buildTarget);
         BlockPos stepBelow = step.below();
 
         if (!level.getBlockState(stepBelow).isSolid()) {
-            EnemyBrake_N_BuildUtils.placeBlock(level, stepBelow);
+            EnemyBreak_N_BuildUtils.placeBlock(level, stepBelow);
         }
     }
 }

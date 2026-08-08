@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;

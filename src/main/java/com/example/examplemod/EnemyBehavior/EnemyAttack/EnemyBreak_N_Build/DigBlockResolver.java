@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build;
 
 import com.example.examplemod.BetterEnemysAI;
 import com.example.examplemod.Config;
@@ -30,7 +30,7 @@ public final class DigBlockResolver {
 
         ResourceLocation id = ResourceLocation.tryParse(configuredId);
         if (id == null) {
-            BetterEnemysAI.LOGGER.warn("EnemyBrake_N_Build: невалідний ID блоку в конфізі: '{}', fallback на булижник", configuredId);
+            BetterEnemysAI.LOGGER.warn("EnemyBreak_N_Build: невалідний ID блоку в конфізі: '{}', fallback на булижник", configuredId);
             return Blocks.COBBLESTONE;
         }
 
@@ -38,7 +38,7 @@ public final class DigBlockResolver {
         if (block == Blocks.AIR && !id.equals(ResourceLocation.withDefaultNamespace("air"))) {
             // DefaultedRegistry повертає AIR, якщо ID не знайдено в реєстрі — і сам air теж AIR,
             // тому звіряємось ще й з ID, щоб не сплутати "не знайдено" з дійсним запитом air.
-            BetterEnemysAI.LOGGER.warn("EnemyBrake_N_Build: блок '{}' не знайдено в реєстрі, fallback на булижник", configuredId);
+            BetterEnemysAI.LOGGER.warn("EnemyBreak_N_Build: блок '{}' не знайдено в реєстрі, fallback на булижник", configuredId);
             return Blocks.COBBLESTONE;
         }
         return block;

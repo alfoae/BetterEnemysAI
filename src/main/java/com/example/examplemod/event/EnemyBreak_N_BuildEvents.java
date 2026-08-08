@@ -2,9 +2,9 @@ package com.example.examplemod.event;
 
 import com.example.examplemod.BetterEnemysAI;
 import com.example.examplemod.Config;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build.DigBlockResolver;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build.MiningTierData;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build.TemporaryBlockData;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.DigBlockResolver;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.MiningTierData;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.TemporaryBlockData;
 import com.example.examplemod.utils.IMobBlockStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -34,7 +34,7 @@ import java.util.Map;
  * </ul>
  */
 @EventBusSubscriber(modid = "betterenemysai")
-public class EnemyBrake_N_BuildEvents {
+public class EnemyBreak_N_BuildEvents {
 
     @SubscribeEvent
     public static void onAdvancementEarn(AdvancementEvent.AdvancementEarnEvent event) {
@@ -43,7 +43,7 @@ public class EnemyBrake_N_BuildEvents {
         ResourceLocation id = event.getAdvancement().id();
         MiningTierData data = MiningTierData.get(event.getEntity().level().getServer());
         if (data.tryUpgrade(id)) {
-            BetterEnemysAI.LOGGER.info("EnemyBrake_N_Build: mining tier піднято до {} (досягнення {})",
+            BetterEnemysAI.LOGGER.info("EnemyBreak_N_Build: mining tier піднято до {} (досягнення {})",
                     data.getTier(), id);
         }
     }
