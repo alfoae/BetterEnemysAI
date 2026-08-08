@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySearch;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search;
 
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;

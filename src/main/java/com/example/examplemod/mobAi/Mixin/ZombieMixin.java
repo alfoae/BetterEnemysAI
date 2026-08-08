@@ -1,6 +1,8 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build.BuildPathGoal;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBrake_N_Build.DigThroughWallsGoal;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterZombieGoalAi;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.monster.Drowned;
@@ -37,6 +39,11 @@ public class ZombieMixin {
         );
 
         mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
-        mob.goalSelector.addGoal(2, new BetterZombieGoalAi(mob, 1.0D));
+        // Пріоритет 1 (вищий за BetterZombieGoalAi на 2) - обидва тримають MOVE+LOOK, і коли
+        // копання дійсно потрібне (шлях заблокований), воно повинне перебивати звичайний рух.
+        // Коли шлях вільний - canUse() тут false, і BetterZombieGoalAi спокійно керує сам.
+        mob.goalSelector.addGoal(1, new BuildPathGoal(mob));
+        mob.goalSelector.addGoal(2, new DigThroughWallsGoal(mob));
+        mob.goalSelector.addGoal(3, new BetterZombieGoalAi(mob, 1.0D));
     }
 }

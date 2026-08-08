@@ -1,6 +1,6 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
 import com.example.examplemod.utils.AdvancedAimMath;
 import com.example.examplemod.utils.ProjectileTrajectory;
 import net.minecraft.world.entity.LivingEntity;

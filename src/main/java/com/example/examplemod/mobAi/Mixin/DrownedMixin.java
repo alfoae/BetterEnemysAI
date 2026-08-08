@@ -1,8 +1,8 @@
 package com.example.examplemod.mobAi.Mixin;
 
 import com.example.examplemod.BetterEnemysAI;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyMeleeBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyMeleeBehavior;
 import com.example.examplemod.mobAi.Goal.BetterDrownedGoalAi;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;

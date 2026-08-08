@@ -1,7 +1,7 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyMeleeBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyMeleeBehavior;
 import com.example.examplemod.mobAi.Goal.BetterPillagerVindicatorGoalAi;
 import com.example.examplemod.mobAi.Goal.IdleCrossbowGoal;
 import com.example.examplemod.mobAi.Goal.SwapWeaponGoal;

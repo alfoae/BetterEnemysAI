@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;

@@ -1,10 +1,10 @@
 package com.example.examplemod.mobAi.Mixin;
 
 import com.example.examplemod.BetterEnemysAI;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitBrainBridgeGoal;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
-import com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon.EnemySwap_and_UseWeaponConditionalBehavior;
-import com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon.PiglinSwapWeaponBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitBrainBridgeGoal;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySwap_N_UseWeapon.EnemySwap_and_UseWeaponConditionalBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySwap_N_UseWeapon.PiglinSwapWeaponBehavior;
 import com.example.examplemod.mobAi.Goal.BetterPiglinGoalAi;
 import com.example.examplemod.mobAi.Goal.IdleCrossbowGoal;
 import com.google.common.collect.ImmutableList;

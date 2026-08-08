@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemySwap_and_UseWeapon;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySwap_N_UseWeapon;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;

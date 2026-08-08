@@ -1,6 +1,5 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySearch.SearchGrid;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -124,6 +123,17 @@ public class PursuitEnemyBehavior extends Goal {
     }
 
     /**
+     * Специфічно для терраформінгу (копання/будівництво): ці дії мають діяти під час CHASING і
+     * GOING_TO_LAST_SEEN, але НЕ під час SEARCHING (мобу не варто "відволікатись" на прокопку
+     * випадкової печери замість того, щоб спокійно пройти й нормально пошукати). Один
+     * {@code isMemoryChasing} для цього недостатній — він true для ВСІХ трьох станів одразу.
+     */
+    public static boolean isSearchModeActive(Mob mob) {
+        MemoryData data = MEMORY.get(mob);
+        return data != null && data.state == State.SEARCHING;
+    }
+
+    /**
      * Гравець, якого зараз реально тримає ця система пам'яті (тобто {@code data.trackedPlayer}),
      * АБО {@code null}, якщо системи немає чи вона вже в стані FORGOTTEN (тобто "забула" — далі
      * рішення повністю за звичайним ванільним/Brain-таргетингом мобу).
@@ -243,8 +253,8 @@ public class PursuitEnemyBehavior extends Goal {
      * далі за FOLLOW_RANGE не повинен красти агро, навіть якщо він єдиний видимий напряму.
      *
      * @return найближчого підхожого гравця, ЯКЩО він строго ближче за currentTracked; {@code null},
-     * якщо кращого кандидата нема (currentTracked і сам лишається найближчим видимим, або
-     * єдиним видимим взагалі) — тоді ціль лишається без змін.
+     *         якщо кращого кандидата нема (currentTracked і сам лишається найближчим видимим, або
+     *         єдиним видимим взагалі) — тоді ціль лишається без змін.
      */
     private Player findCloserVisiblePlayer(Player currentTracked, double followRangeSq) {
         double bestDistSq = this.mob.distanceToSqr(currentTracked);

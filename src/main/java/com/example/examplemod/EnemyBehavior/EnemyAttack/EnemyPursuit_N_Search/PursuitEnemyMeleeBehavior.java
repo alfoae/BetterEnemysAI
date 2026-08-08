@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search;
 
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;

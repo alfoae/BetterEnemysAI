@@ -1,6 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.PursuitEnemyBehavior;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterSkeletonGoalAi;
 import net.minecraft.world.entity.ai.goal.RangedBowAttackGoal;
 import net.minecraft.world.entity.monster.AbstractSkeleton;

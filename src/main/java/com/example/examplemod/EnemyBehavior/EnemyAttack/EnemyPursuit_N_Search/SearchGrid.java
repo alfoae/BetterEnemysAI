@@ -1,4 +1,4 @@
-package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySearch;
+package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
