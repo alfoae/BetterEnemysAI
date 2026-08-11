@@ -42,8 +42,8 @@ public class ZombieMixin {
         // Пріоритет 1 (вищий за BetterZombieGoalAi на 2) - обидва тримають MOVE+LOOK, і коли
         // копання дійсно потрібне (шлях заблокований), воно повинне перебивати звичайний рух.
         // Коли шлях вільний - canUse() тут false, і BetterZombieGoalAi спокійно керує сам.
-        mob.goalSelector.addGoal(2, new BuildPathGoal(mob));
-        mob.goalSelector.addGoal(1, new DigThroughWallsGoal(mob));
+        mob.goalSelector.addGoal(1, new BuildPathGoal(mob));
+        mob.goalSelector.addGoal(2, new DigThroughWallsGoal(mob));
         mob.goalSelector.addGoal(3, new BetterZombieGoalAi(mob, 1.0D));
     }
 }

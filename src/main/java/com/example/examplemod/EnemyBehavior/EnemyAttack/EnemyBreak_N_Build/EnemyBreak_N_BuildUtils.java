@@ -14,25 +14,18 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.NotNull;
 
-/**
- * Спільне для {@link DigThroughWallsGoal} і {@link BuildPathGoal} — обидва мають ту саму гейт-
- * логіку (конфіг/mobGriefing/CHASING-не-SEARCHING) і те саме "куди взагалі йдемо" (найближча до
- * мобу порожня ділянка на висоті гравця, не сама точка гравця — див. {@link #findNearestOpenArea}).
- * Різняться лише тим, ЩО роблять, коли шлях туди заблокований: копання прибирає суцільну
- * перепону, будівництво заповнює яму чи піднімається вгору.
- */
 public final class EnemyBreak_N_BuildUtils {
 
     public static final int SEARCH_XZ_RADIUS = 8;
     public static final int SEARCH_Y_RADIUS = 3;
 
+    private static final double MIN_CANDIDATE_DIST_SQ = 4.0;
+
     private EnemyBreak_N_BuildUtils() {
     }
 
-    /**
-     * Спільний гейт: конфіг увімкнений, mobGriefing увімкнений, моб у CHASING/GOING_TO_LAST_SEEN (не SEARCHING).
-     */
     public static boolean canOperate(Mob mob) {
         if (!Config.ENABLE_MOB_TERRAFORMING.get()) return false;
         if (!(mob.level() instanceof ServerLevel level)) return false;
@@ -42,18 +35,35 @@ public final class EnemyBreak_N_BuildUtils {
     }
 
     /**
-     * Чи справді звичайна навігація не може прокласти шлях (а не просто "є перепона попереду").
+     * "Заблоковано" з надбавкою за різницю висот: ціль на 2+ блоки вище вважається заблокованою,
+     * навіть якщо ванільний шлях технічно існує — так тригериться підйом у {@link BuildPathGoal}.
+     * {@link DigThroughWallsGoal} висота сама по собі не цікавить (копання не залежить від того,
+     * наскільки вище ціль) — там використовується чистіший {@link #isNavigationBlocked} без цієї
+     * надбавки. Дві різні назви навмисно — щоб однакова назва не наштовхувала на думку, що це
+     * один і той самий тест.
      */
     public static boolean isPathBlocked(Mob mob, Vec3 chasePos) {
-        Path path = mob.getNavigation().createPath(BlockPos.containing(chasePos), 0);
-        return path == null || !path.canReach();
+        double heightDifference = chasePos.y - mob.getY();
+
+        if (heightDifference >= 2.0) {
+            return true;
+        }
+
+        return isNavigationBlocked(mob, chasePos);
     }
 
     /**
-     * Найближча ДО МОБУ (не до гравця!) "прохідна кишеня" в радіусі навколо живої/застиглої
-     * точки гравця, +- {@link #SEARCH_Y_RADIUS} по висоті. Якщо нічого не знайдено, повертає
-     * саму точку гравця як фолбек.
+     * Чисто "чи існує прохідний шлях" до точки переслідування — без надбавки за висоту з
+     * {@link #isPathBlocked}. Використовується {@link DigThroughWallsGoal}, якому висота не
+     * заважає: копання йде в напрямку цілі незалежно від того, вище вона чи нижче.
      */
+    public static boolean isNavigationBlocked(Mob mob, Vec3 chasePos) {
+        Path path = mob.getNavigation().createPath(
+                BlockPos.containing(chasePos), 0);
+
+        return path == null || !path.canReach();
+    }
+
     public static BlockPos findNearestOpenArea(Mob mob, Level level, Vec3 chasePos) {
         BlockPos center = BlockPos.containing(chasePos);
         BlockPos mobPos = mob.blockPosition();
@@ -65,12 +75,12 @@ public final class EnemyBreak_N_BuildUtils {
             for (int dx = -SEARCH_XZ_RADIUS; dx <= SEARCH_XZ_RADIUS; dx++) {
                 for (int dz = -SEARCH_XZ_RADIUS; dz <= SEARCH_XZ_RADIUS; dz++) {
                     BlockPos candidate = center.offset(dx, dy, dz);
-                    if (isPassableColumn(level, candidate)) {
-                        double distSq = mobPos.distSqr(candidate);
-                        if (distSq < bestDistSq) {
-                            bestDistSq = distSq;
-                            best = candidate;
-                        }
+                    double distSq = mobPos.distSqr(candidate);
+
+                    if (distSq <= MIN_CANDIDATE_DIST_SQ) continue;
+                    if (distSq < bestDistSq && isPassableColumn(level, candidate)) {
+                        bestDistSq = distSq;
+                        best = candidate;
                     }
                 }
             }
@@ -84,9 +94,6 @@ public final class EnemyBreak_N_BuildUtils {
                 && level.getBlockState(pos.below()).isSolid();
     }
 
-    /**
-     * Грубий "жадібний" горизонтальний крок у напрямку цілі (не повний A*).
-     */
     public static BlockPos nextHorizontalStep(Mob mob, BlockPos target) {
         BlockPos mobPos = mob.blockPosition();
         Vec3 dir = Vec3.atCenterOf(target).subtract(Vec3.atCenterOf(mobPos));
@@ -95,9 +102,6 @@ public final class EnemyBreak_N_BuildUtils {
         return mobPos.offset((int) Math.round(dir.x), 0, (int) Math.round(dir.z));
     }
 
-    /**
-     * Чи можна зламати цей блок (не повітря, не бедрок/незламне, немає block entity - скрині/спавнери).
-     */
     public static boolean isBreakable(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (state.isAir() || !state.isSolid()) return false;
@@ -105,9 +109,6 @@ public final class EnemyBreak_N_BuildUtils {
         return !state.hasBlockEntity();
     }
 
-    /**
-     * Ламає блок, кладе його в {@link IMobBlockStorage} мобу (якщо той реалізує інтерфейс), грає звук.
-     */
     public static void breakBlock(Level level, BlockPos pos, Mob mob) {
         BlockState state = level.getBlockState(pos);
 
@@ -120,9 +121,6 @@ public final class EnemyBreak_N_BuildUtils {
         level.destroyBlock(pos, false);
     }
 
-    /**
-     * Ставить блок мосту/вежі (за {@link DigBlockResolver}) і реєструє його на зникнення в {@link TemporaryBlockData}.
-     */
     public static void placeBlock(ServerLevel level, BlockPos pos) {
         Block block = DigBlockResolver.getDigBlock(level);
         BlockState state = block.defaultBlockState();

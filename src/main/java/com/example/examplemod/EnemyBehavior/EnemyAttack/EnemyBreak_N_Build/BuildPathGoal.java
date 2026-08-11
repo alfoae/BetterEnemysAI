@@ -51,7 +51,6 @@ public class BuildPathGoal extends Goal {
     public boolean canUse() {
         if (!EnemyBreak_N_BuildUtils.canOperate(this.mob)) return false;
         if (!(this.mob.level() instanceof ServerLevel level)) return false;
-
         Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
         if (chasePos == null) return false;
         if (!EnemyBreak_N_BuildUtils.isPathBlocked(this.mob, chasePos)) return false;
@@ -102,13 +101,29 @@ public class BuildPathGoal extends Goal {
             }
         }
 
-        if (this.mob.blockPosition().distSqr(this.buildTarget) <= ARRIVED_DIST_SQ) {
+        if (this.mob.blockPosition().distSqr(this.buildTarget) <= ARRIVED_DIST_SQ
+                && !EnemyBreak_N_BuildUtils.isPathBlocked(this.mob, chasePos)) {
             this.buildTarget = null;
             return;
         }
 
         this.mob.getLookControl().setLookAt(
                 this.buildTarget.getX() + 0.5, this.buildTarget.getY() + 0.5, this.buildTarget.getZ() + 0.5, 30.0F, 30.0F);
+
+        // ФІКС (не ставив блок при стрибку): підкладаємо підлогу під ноги КОЖЕН тік, поки моб у
+        // повітрі (onGround() == false) - а не лише разом з рештою дій раз на
+        // BUILD_ACTION_COOLDOWN_TICKS (10 тіків) в блоці нижче. Стара логіка перевіряла
+        // feet.below() ДО стрибка - тобто саму землю, на якій моб і так стояв (вона за
+        // визначенням завжди суцільна), тож умова "якщо не суцільний" ніколи не спрацьовувала.
+        // Правильне місце для нового блоку - це стара позиція під ногами, яка звільняється
+        // ПІСЛЯ стрибка; перевіряти це потрібно щотіку, бо вікно "у повітрі" коротке і по
+        // 10-тіковому кулдауну його легко проґавити повністю (моб просто впаде назад).
+        if (!this.mob.onGround()) {
+            BlockPos below = this.mob.blockPosition().below();
+            if (!level.getBlockState(below).isSolid()) {
+                EnemyBreak_N_BuildUtils.placeBlock(level, below);
+            }
+        }
 
         if (--this.actionCooldown <= 0) {
             this.actionCooldown = BUILD_ACTION_COOLDOWN_TICKS;
@@ -147,12 +162,12 @@ public class BuildPathGoal extends Goal {
             return;
         }
 
-        BlockPos below = feet.below();
-        if (!level.getBlockState(below).isSolid()) {
-            EnemyBreak_N_BuildUtils.placeBlock(level, below);
+        // Підкладання блоку під ноги ПІД ЧАС стрибка тепер робить tick() щотіку (див. вище) -
+        // тут лишається тільки сам стрибок, і тільки коли моб дійсно стоїть на землі (інакше
+        // getJumpControl().jump() посеред польоту нічого не змінює).
+        if (this.mob.onGround()) {
+            this.mob.getJumpControl().jump();
         }
-
-        this.mob.getJumpControl().jump();
     }
 
     private void handleBridge(ServerLevel level) {

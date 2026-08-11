@@ -1,44 +1,40 @@
 package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build;
 
-import com.example.examplemod.Config;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
 import com.example.examplemod.event.EnemyBreak_N_BuildEvents;
-import com.example.examplemod.utils.IMobBlockStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
 
 /**
- * Копання крізь перепони до заагреного гравця. Діє ЛИШЕ в CHASING/GOING_TO_LAST_SEEN (не в
- * SEARCHING — див. {@link PursuitEnemyBehavior#isSearchModeActive}) і ЛИШЕ коли звичайна
- * навігація реально не може прокласти шлях (не про "перепону є" — про "перепона блокує ВЕСЬ
- * шлях"). Ціль копання — НЕ точна позиція гравця, а найближча до мобу "порожня ділянка" на
- * приблизно тій самій висоті (див. {@link #findNearestOpenArea}) — щоб гравець, який просто
- * бігає колами на верхівці вузької колони, не змушував мобу копати нескінченний тунель за живою
- * позицією, а натомість моб пробивався до найближчого природного "кишені" на тому ж рівні.
+ * РљРѕРїР°С” РєСЂС–Р·СЊ СЃСѓС†С–Р»СЊРЅСѓ СЃС‚С–РЅСѓ РЅР° С€Р»СЏС…Сѓ РґРѕ С†С–Р»С–. РџР°СЂР° РґРѕ {@link BuildPathGoal}: С‚РѕР№ Р±РµСЂРµ РЅР° СЃРµР±Рµ
+ * РїС–РґР№РѕРј (С†С–Р»СЊ РїРѕРјС–С‚РЅРѕ РІРёС‰Рµ) С– РјРѕСЃС‚Рё (СЏРјР° РїРѕРїРµСЂРµРґСѓ), С†РµР№ вЂ” РІРёРїР°РґРѕРє, РєРѕР»Рё РїРѕРїРµСЂРµРґСѓ РїСЂРѕСЃС‚Рѕ СЃС‚С–РЅР°.
+ * Р РѕР·РјРµР¶СѓРІР°РЅРЅСЏ РїСЂРёСЂРѕРґРЅРµ С‡РµСЂРµР· {@code canUse()} РѕР±РѕС… Goal-С–РІ (СЏРєС‰Рѕ РЅР°СЃС‚СѓРїРЅРёР№ РєСЂРѕРє РЅРµ СЃСѓС†С–Р»СЊРЅРёР№ вЂ”
+ * С†Рµ РЅРµ СЃСЋРґРё), СЏРІРЅРѕС— РєРѕРѕСЂРґРёРЅР°С†С–С— РјС–Р¶ РЅРёРјРё РЅРµ РїРѕС‚СЂС–Р±РЅРѕ.
  * <p>
- * Швидкість лам ання — {@link MiningTierData#getTicksPerBlock()}, глобальний тір усього сервера.
- * Зламані блоки йдуть у {@link IMobBlockStorage} мобу (дроп при смерті — {@link EnemyBreak_N_BuildEvents}).
- * Пропускає блоки з block entity (скрині, спавнери тощо) — свідоме обмеження, не було в
- * ТЗ явно, але ламати гравцеві скриню виглядає як явний перебір.
+ * РђРєС‚РёРІРЅРёР№ Р»РёС€Рµ РІ CHASING/GOING_TO_LAST_SEEN (РЅРµ РІ SEARCHING вЂ” РґРёРІ.
+ * {@link PursuitEnemyBehavior#isSearchModeActive}), С– Р»РёС€Рµ РїРѕРєРё С€Р»СЏС… РґРѕ Р¶РёРІРѕС—/Р·Р°СЃС‚РёРіР»РѕС— С‚РѕС‡РєРё
+ * РїРµСЂРµСЃР»С–РґСѓРІР°РЅРЅСЏ РґС–Р№СЃРЅРѕ Р·Р°Р±Р»РѕРєРѕРІР°РЅРёР№. РЎРїС–Р»СЊРЅРёР№ РіРµР№С‚ С– РїРµСЂРµРІС–СЂРєР° С€Р»СЏС…Сѓ вЂ” {@link EnemyBreak_N_BuildUtils}.
+ * <p>
+ * Р¦С–Р»СЊ РєРѕРїР°РЅРЅСЏ вЂ” РЅРµ С‚РѕС‡РЅР° РїРѕР·РёС†С–СЏ РіСЂР°РІС†СЏ, Р° РЅР°Р№Р±Р»РёР¶С‡Р° РїСЂРѕС…С–РґРЅР° РєРѕР»РѕРЅРєР° Р±С–Р»СЏ РЅРµС— (РґРёРІ.
+ * {@link EnemyBreak_N_BuildUtils#findNearestOpenArea}), С– РЅР° РєРѕР¶РЅРѕРјСѓ РєСЂРѕС†С– Р»Р°РјР°С”С‚СЊСЃСЏ Р»РёС€Рµ РѕРґРёРЅ
+ * Р±Р»РѕРє Сѓ РЅР°РїСЂСЏРјРєСѓ СЂСѓС…Сѓ РїРѕ РїСЂСЏРјС–Р№ вЂ” С†Рµ РќР• РїРѕРІРЅРѕС†С–РЅРЅРёР№ A*, Р° РїСЂРѕСЃС‚Р° РµРІСЂРёСЃС‚РёРєР°.
+ * <p>
+ * РЁРІРёРґРєС–СЃС‚СЊ РєРѕРїР°РЅРЅСЏ вЂ” {@link MiningTierData#getTicksPerBlock()}, РіР»РѕР±Р°Р»СЊРЅРёР№ С‚С–СЂ РЅР° РІРµСЃСЊ СЃРµСЂРІРµСЂ.
+ * Р’РёРєРѕРїР°РЅС– Р±Р»РѕРєРё СЃРєР»Р°РґР°СЋС‚СЊСЃСЏ РІ {@code IMobBlockStorage} РјРѕР±Р° (РґСЂРѕРї РїСЂРё СЃРјРµСЂС‚С– вЂ” РѕР±СЂРѕР±Р»СЏС”С‚СЊСЃСЏ РІ
+ * {@link EnemyBreak_N_BuildEvents}). Р‘Р»РѕРєРё Р· block entity (СЃРєСЂРёРЅС–, СЃРїР°РІРЅРµСЂРё С‚РѕС‰Рѕ) РЅРµ Р»Р°РјР°СЋС‚СЊСЃСЏ вЂ”
+ * РґРёРІ. {@link EnemyBreak_N_BuildUtils#isBreakable}.
  */
 public class DigThroughWallsGoal extends Goal {
 
-    private static final int SEARCH_XZ_RADIUS = 8;
-    private static final int SEARCH_Y_RADIUS = 3;
-    private static final int RETARGET_INTERVAL_TICKS = 40; // раз на 2с - гравець встигає рухатись, але не спамимо пошук
+    private static final int RETARGET_INTERVAL_TICKS = 40; // СЂР°Р· РЅР° 2СЃ - РґРѕСЃРёС‚СЊ С‡Р°СЃС‚Рѕ, С‰РѕР± РЅРµ С‚СѓРїРёС‚Рё, С– РЅРµ Р·Р°РЅР°РґС‚Рѕ, С‰РѕР± РЅРµ РіСЂС–С‚Рё СЃРµСЂРІРµСЂ
     private static final int STUCK_CHECK_INTERVAL_TICKS = 20;
-    private static final double ARRIVED_DIST_SQ = 4.0; // 2 блоки - "дійшли, далі хай навігація сама"
+    private static final double ARRIVED_DIST_SQ = 4.0; // 2 Р±Р»РѕРєРё - РІРІР°Р¶Р°С”РјРѕ, С‰Рѕ РґС–Р№С€Р»Рё РґРѕ С†С–Р»С–
 
     private final Mob mob;
 
@@ -55,27 +51,19 @@ public class DigThroughWallsGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (!Config.ENABLE_MOB_TERRAFORMING.get()) return false;
-        if (!(this.mob.level() instanceof ServerLevel level)) return false;
-        if (!level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) return false;
-        if (!PursuitEnemyBehavior.isMemoryChasing(this.mob)) return false;
-        if (PursuitEnemyBehavior.isSearchModeActive(this.mob)) return false;
+        if (!EnemyBreak_N_BuildUtils.canOperate(this.mob)) return false;
 
         Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
         if (chasePos == null) return false;
 
-        return isPathBlocked(chasePos);
+        return EnemyBreak_N_BuildUtils.isNavigationBlocked(this.mob, chasePos);
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (!Config.ENABLE_MOB_TERRAFORMING.get()) return false;
-        if (!(this.mob.level() instanceof ServerLevel level)) return false;
-        if (!level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) return false;
-        if (!PursuitEnemyBehavior.isMemoryChasing(this.mob)) return false;
-        if (PursuitEnemyBehavior.isSearchModeActive(this.mob)) return false;
-        // НЕ перевіряємо isPathBlocked щотіку тут (дорого) - лише при периодичному
-        // stuckCheckTimer в tick(), який сам зупинить Goal, скинувши стан до "шлях вільний".
+        if (!EnemyBreak_N_BuildUtils.canOperate(this.mob)) return false;
+        // РЎРІС–РґРѕРјРѕ РќР• РїРµСЂРµРІС–СЂСЏС”РјРѕ isNavigationBlocked С‚СѓС‚ С‰Рµ СЂР°Р· (РґРѕСЂРѕРіР° РѕРїРµСЂР°С†С–СЏ) - РїРѕРєРё Goal РІР¶Рµ
+        // Р°РєС‚РёРІРЅРёР№, Р·Р° С†РёРј СЃС‚РµР¶РёС‚СЊ stuckCheckTimer Сѓ tick(), СЃРєРёРґР°СЋС‡Рё digTarget РЅР° "С€Р»СЏС… РІС–Р»СЊРЅРёР№".
         return this.digTarget != null;
     }
 
@@ -106,24 +94,24 @@ public class DigThroughWallsGoal extends Goal {
         }
 
         if (--this.retargetTimer <= 0 || this.digTarget == null) {
-            this.digTarget = findNearestOpenArea(level, chasePos);
+            this.digTarget = EnemyBreak_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
             this.retargetTimer = RETARGET_INTERVAL_TICKS;
         }
 
-        // Періодично перевіряємо, чи шлях уже звільнився (наприклад, гравець сам відійшов) -
-        // якщо так, canContinueToUse на наступному циклі GoalSelector-а поверне false природно
-        // через те, що currentlyBreaking==null і pickNextBlockToBreak() теж поверне null,
-        // а digTarget не скидаємо тут навмисно - хай navigation сама доведе до кінця останній крок.
+        // РџРµСЂС–РѕРґРёС‡РЅРѕ РїРµСЂРµРїСЂРѕРІС–СЂСЏС”РјРѕ, С‡Рё С€Р»СЏС… С– РґРѕСЃС– Р·Р°Р±Р»РѕРєРѕРІР°РЅРёР№ (РЅР°РїСЂРёРєР»Р°Рґ, РіСЂР°РІРµС†СЊ СЃР°Рј
+        // РїСЂРѕРєРѕРїР°РІ СЃС‚С–РЅСѓ) - С–РЅР°РєС€Рµ canContinueToUse() С‚СѓС‚ РЅРµ РґРѕРїРѕРјРѕР¶Рµ: РІС–РЅ Р»РёС€Рµ РґРёРІРёС‚СЊСЃСЏ, С‡Рё
+        // currentlyBreaking==null С– pickNextBlockToBreak() С– РґР°Р»С– РїРѕРІРµСЂС‚Р°С‚РёРјРµ null, Р° digTarget
+        // СЃР°Рј СЃРѕР±РѕСЋ РЅРµ СЃРєРёРЅРµС‚СЊСЃСЏ - Р±РµР· С†СЊРѕРіРѕ navigation РјС–Рі Р±Рё РґРѕРІРіРѕ Р№С‚Рё РЅР° Р·Р°СЃС‚Р°СЂС–Р»Сѓ С†С–Р»СЊ.
         if (--this.stuckCheckTimer <= 0) {
             this.stuckCheckTimer = STUCK_CHECK_INTERVAL_TICKS;
-            if (!isPathBlocked(chasePos)) {
+            if (!EnemyBreak_N_BuildUtils.isNavigationBlocked(this.mob, chasePos)) {
                 this.digTarget = null;
                 return;
             }
         }
 
-        if (this.mob.blockPosition().distSqr(this.digTarget) <= ARRIVED_DIST_SQ) {
-            // Дійшли до відкритої ділянки - далі це вже не наша робота.
+        if (this.mob.blockPosition().distSqr(this.digTarget) <= ARRIVED_DIST_SQ
+                && !EnemyBreak_N_BuildUtils.isNavigationBlocked(this.mob, chasePos)) {
             this.digTarget = null;
             return;
         }
@@ -137,7 +125,7 @@ public class DigThroughWallsGoal extends Goal {
             this.breakProgressTicks++;
             int ticksNeeded = MiningTierData.get(level.getServer()).getTicksPerBlock();
             if (this.breakProgressTicks >= ticksNeeded) {
-                breakBlock(level, this.currentlyBreaking);
+                EnemyBreak_N_BuildUtils.breakBlock(level, this.currentlyBreaking, this.mob);
                 this.currentlyBreaking = null;
                 this.breakProgressTicks = 0;
             }
@@ -150,51 +138,8 @@ public class DigThroughWallsGoal extends Goal {
     }
 
     /**
-     * Чи справді звичайна навігація не може прокласти шлях (а не просто "є перепона попереду").
-     */
-    private boolean isPathBlocked(Vec3 chasePos) {
-        Path path = this.mob.getNavigation().createPath(BlockPos.containing(chasePos), 0);
-        return path == null || !path.canReach();
-    }
-
-    /**
-     * Найближча ДО МОБУ (не до гравця!) "прохідна кишеня" в радіусі навколо живої/застиглої
-     * точки гравця, +- {@link #SEARCH_Y_RADIUS} по висоті. Свідомо обмежений радіус пошуку —
-     * якщо нічого не знайдено, повертаємось до самої точки гравця як фолбек (краще спробувати
-     * докопатись напряму, ніж взагалі нічого не робити).
-     */
-    private BlockPos findNearestOpenArea(Level level, Vec3 chasePos) {
-        BlockPos center = BlockPos.containing(chasePos);
-        BlockPos mobPos = this.mob.blockPosition();
-
-        BlockPos best = null;
-        double bestDistSq = Double.MAX_VALUE;
-
-        for (int dy = -SEARCH_Y_RADIUS; dy <= SEARCH_Y_RADIUS; dy++) {
-            for (int dx = -SEARCH_XZ_RADIUS; dx <= SEARCH_XZ_RADIUS; dx++) {
-                for (int dz = -SEARCH_XZ_RADIUS; dz <= SEARCH_XZ_RADIUS; dz++) {
-                    BlockPos candidate = center.offset(dx, dy, dz);
-                    if (isPassableColumn(level, candidate)) {
-                        double distSq = mobPos.distSqr(candidate);
-                        if (distSq < bestDistSq) {
-                            bestDistSq = distSq;
-                            best = candidate;
-                        }
-                    }
-                }
-            }
-        }
-        return best != null ? best : center;
-    }
-
-    private boolean isPassableColumn(Level level, BlockPos pos) {
-        return !level.getBlockState(pos).isSolid()
-                && !level.getBlockState(pos.above()).isSolid()
-                && level.getBlockState(pos.below()).isSolid();
-    }
-
-    /**
-     * Наступний блок на шляху до digTarget - грубий "жадібний" крок у напрямку цілі, не повний A*.
+     * РџСЂРѕРєР»Р°РґР°С” С€Р»СЏС… РґРѕ digTarget РїРѕ РїСЂСЏРјС–Р№ вЂ” Р»Р°РјР°С” Р»РёС€Рµ "РЅР°СЃС‚СѓРїРЅРёР№" Р±Р»РѕРє Сѓ РЅР°РїСЂСЏРјРєСѓ СЂСѓС…Сѓ,
+     * Р° РЅРµ РїРѕРІРЅРѕС†С–РЅРЅРёР№ A*.
      */
     private BlockPos pickNextBlockToBreak(Level level) {
         BlockPos mobPos = this.mob.blockPosition();
@@ -203,39 +148,20 @@ public class DigThroughWallsGoal extends Goal {
         dir = dir.normalize();
 
         BlockPos step = mobPos.offset((int) Math.round(dir.x), 0, (int) Math.round(dir.z));
-        if (isBreakable(level, step)) return step;
+        if (EnemyBreak_N_BuildUtils.isBreakable(level, step)) return step;
 
         BlockPos stepUp = step.above();
-        if (isBreakable(level, stepUp)) return stepUp;
+        if (EnemyBreak_N_BuildUtils.isBreakable(level, stepUp)) return stepUp;
 
-        // Можливо треба піднятись/спуститись (гравець вище/нижче) - пробуємо й вертикальний крок.
+        // Р¦С–Р»СЊ РїРѕРјС–С‚РЅРѕ РІРёС‰Рµ/РЅРёР¶С‡Рµ (СЏРјР°/С‚СѓРЅРµР»СЊ РІРµСЂС‚РёРєР°Р»СЊРЅРѕ) - РїСЂРѕР±СѓС”РјРѕ РІ РІРµСЂС‚РёРєР°Р»СЊРЅРѕРјСѓ РЅР°РїСЂСЏРјРєСѓ.
         if (dir.y > 0.3) {
             BlockPos up = mobPos.above(2);
-            if (isBreakable(level, up)) return up;
+            if (EnemyBreak_N_BuildUtils.isBreakable(level, up)) return up;
         } else if (dir.y < -0.3) {
             BlockPos down = mobPos.below();
-            if (isBreakable(level, down)) return down;
+            if (EnemyBreak_N_BuildUtils.isBreakable(level, down)) return down;
         }
 
         return null;
-    }
-
-    private boolean isBreakable(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        if (state.isAir() || !state.isSolid()) return false;
-        if (state.getDestroySpeed(level, pos) < 0) return false; // незламний (бедрок і т.д.)
-        return !state.hasBlockEntity(); // скрині, спавнери, тощо - не чіпаємо
-    }
-
-    private void breakBlock(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-
-        ItemStack drop = new ItemStack(state.getBlock().asItem());
-        if (!drop.isEmpty() && this.mob instanceof IMobBlockStorage storage) {
-            storage.addDugBlock(drop);
-        }
-
-        level.playSound(null, pos, state.getSoundType().getBreakSound(), SoundSource.HOSTILE, 1.0F, 1.0F);
-        level.destroyBlock(pos, false);
     }
 }
