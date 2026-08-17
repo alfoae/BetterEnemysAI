@@ -7,14 +7,18 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
+
+import java.util.Map;
+import java.util.WeakHashMap;
 
 public final class EnemyBreak_N_BuildUtils {
 
@@ -23,7 +27,76 @@ public final class EnemyBreak_N_BuildUtils {
 
     private static final double MIN_CANDIDATE_DIST_SQ = 4.0;
 
+    // АРХІТЕКТУРНИЙ ФІКС (за проханням користувача): build/dig мають бути ІНСТРУМЕНТОМ, який
+    // допомагає PursuitEnemyBehavior, а не замінює його. Зараз пріоритети Goal-ів (1,2 вищі за
+    // 3=атака) означають, що щойно шлях "заблоковано" - build/dig миттєво перехоплюють
+    // керування, не давши pursuit жодного шансу. Тому "заблоковано" тепер повертається
+    // НАЗОВНІ, лише якщо це триває безперервно вже PURSUIT_GRACE_PERIOD_TICKS - весь цей час
+    // pursuit (пріоритет 3) може просто дійти й вдарити сам, як і мало бути. Два окремих
+    // трекери (не один спільний) - щоб перевірка height-тригера і nav-тригера не скидали
+    // таймер одна одній, коли обидва Goal питають в один і той самий тік.
+    private static final Map<Mob, Integer> HEIGHT_BLOCKED_SINCE_TICK = new WeakHashMap<>();
+    private static final Map<Mob, Integer> NAV_BLOCKED_SINCE_TICK = new WeakHashMap<>();
+    private static final int PURSUIT_GRACE_PERIOD_TICKS = 30; // 1.5с - скільки часу дається pursuit перш ніж підключати будівництво/копання
+    private static final Map<Mob, NavCache> NAV_CACHE = new WeakHashMap<>();
+
+    /**
+     * ТИМЧАСОВИЙ DEBUG-ЛОГ: тонка обгортка над {@link PursuitEnemyBehavior#debugMsg} — сама лише
+     * резолвить гравця з моба (через {@link PursuitEnemyBehavior#getTrackedPlayer}), щоб виклики
+     * нижче не тягали Player окремим параметром. Видалити разом з усіма викликами нижче після
+     * завершення тестування копання/будівництва.
+     */
+    static void debugMsg(Mob mob, String msg) {
+        Player player = PursuitEnemyBehavior.getTrackedPlayer(mob);
+        if (player != null) {
+            PursuitEnemyBehavior.debugMsg(player, msg);
+        }
+    }
+
     private EnemyBreak_N_BuildUtils() {
+    }
+
+    /**
+     * Реєструє "сире" (без grace-періоду) заблоковано/ні для цього тіку в переданому трекері, і
+     * повертає, чи минув {@link #PURSUIT_GRACE_PERIOD_TICKS}. Якщо в якийсь момент rawBlockedNow
+     * стає false (шлях знову вільний, навіть на 1 тік) - таймер скидається повністю: pursuit
+     * отримує свіжий шанс щоразу, коли перепона зникає, а не просто "накопичує" заблокованість.
+     */
+    private static boolean pastGracePeriod(Map<Mob, Integer> tracker, Mob mob, boolean rawBlockedNow) {
+        if (!rawBlockedNow) {
+            tracker.remove(mob);
+            return false;
+        }
+        int sinceTick = tracker.computeIfAbsent(mob, m -> mob.tickCount);
+        return (mob.tickCount - sinceTick) >= PURSUIT_GRACE_PERIOD_TICKS;
+    }
+
+    /**
+     * "Заблоковано" з надбавкою за різницю висот: ціль на 2+ блоки вище вважається заблокованою,
+     * навіть якщо ванільний шлях технічно існує — так тригериться підйом у {@link BuildPathGoal}.
+     * {@link DigThroughWallsGoal} висота сама по собі не цікавить (копання не залежить від того,
+     * наскільки вище ціль) — там використовується чистіший {@link #isNavigationBlocked} без цієї
+     * надбавки. Дві різні назви навмисно — щоб однакова назва не наштовхувала на думку, що це
+     * один і той самий тест.
+     */
+    public static boolean isPathBlocked(Mob mob, Vec3 chasePos) {
+        double heightDifference = chasePos.y - mob.getY();
+        boolean rawHeightBlocked = heightDifference >= 2.0;
+
+        if (rawHeightBlocked) {
+            boolean pastGrace = pastGracePeriod(HEIGHT_BLOCKED_SINCE_TICK, mob, true);
+            // ТИМЧАСОВИЙ DEBUG: раз/сек - показує саме ЦЮ причину (висота) і статус grace-періоду.
+            if (mob.tickCount % 20 == 0) {
+                Integer since = HEIGHT_BLOCKED_SINCE_TICK.get(mob);
+                int duration = since != null ? mob.tickCount - since : 0;
+                debugMsg(mob, String.format(
+                        "[DEBUG isPathBlocked] висота=%.2f (поріг 2.0) заблоковано_тіків=%d/%d минув_grace=%s",
+                        heightDifference, duration, PURSUIT_GRACE_PERIOD_TICKS, pastGrace));
+            }
+            return pastGrace;
+        }
+
+        return isNavigationBlocked(mob, chasePos);
     }
 
     public static boolean canOperate(Mob mob) {
@@ -35,37 +108,106 @@ public final class EnemyBreak_N_BuildUtils {
     }
 
     /**
-     * "�����������" � ��������� �� ������ �����: ���� �� 2+ ����� ���� ��������� ������������,
-     * ����� ���� ��������� ���� �������� ���� � ��� ����������� ����� � {@link BuildPathGoal}.
-     * {@link DigThroughWallsGoal} ������ ���� �� ��� �� �������� (������� �� �������� �� ����,
-     * �������� ���� ����) � ��� ��������������� ������� {@link #isNavigationBlocked} ��� ����
-     * ��������. �� ���� ����� �������� � ��� �������� ����� �� ������������ �� �����, �� ��
-     * ���� � ��� ����� ����.
+     * СПІЛЬНИЙ кеш шляху на тік — рахує {@code createPath()} НЕ БІЛЬШЕ РАЗУ на тік на моба,
+     * незалежно від того, хто питає: {@code BuildPathGoal.canUse()}, {@code DigThroughWallsGoal
+     * .canUse()} (обидва опитуються GoalSelector-ом ЩОТІКУ, навіть коли не виграють пріоритет —
+     * тобто "чисто перевірка" все одно чіпляє спільний навігатор) чи {@code
+     * PursuitEnemyMeleeBehavior.tick()} через {@link #getOrComputePath}. Знайдено користувачем
+     * через окремий debug-лог "[PATH DEBUG]": два послідовні виклики createPath() з ОДНІЄЮ й
+     * тією ж ціллю в межах одного тіка давали РІЗНІ результати — ванільний NodeEvaluator не
+     * розрахований на повторний виклик у тому самому тіку.
+     * <p>
+     * Ціль рахується через {@code getOnPos()} гравця (реальний блок опори через колізію
+     * хітбокса, не голий floor координати) — АЛЕ тільки коли {@link PursuitEnemyBehavior#isLiveChasing}
+     * (інакше під час GOING_TO_LAST_SEEN/SEARCHING це підмінило б НАВМИСНО застиглу точку живою
+     * позицією гравця — саме така підміна ламала "переслідування по пам'яті").
      */
-    public static boolean isPathBlocked(Mob mob, Vec3 chasePos) {
-        double heightDifference = chasePos.y - mob.getY();
-
-        if (heightDifference >= 2.0) {
-            return true;
+    private static BlockPos resolvePathTarget(Mob mob, Vec3 chasePos) {
+        BlockPos naiveTarget = BlockPos.containing(chasePos);
+        if (!PursuitEnemyBehavior.isLiveChasing(mob)) {
+            return naiveTarget;
         }
-
-        return isNavigationBlocked(mob, chasePos);
+        Player trackedPlayer = PursuitEnemyBehavior.getTrackedPlayer(mob);
+        return trackedPlayer != null ? trackedPlayer.getOnPos().above() : naiveTarget;
     }
 
     /**
-     * ����� "�� ���� ��������� ����" �� ����� ������������� � ��� �������� �� ������ �
-     * {@link #isPathBlocked}. ��������������� {@link DigThroughWallsGoal}, ����� ������ ��
-     * ������: ������� ��� � �������� ��� ��������� �� ����, ���� ���� �� �����.
+     * Повертає закешований (на цей тік, для цієї цілі) {@link Path}, рахуючи {@code createPath()}
+     * лише якщо ще не рахували. Викликається і з {@link #isNavigationBlocked}, і напряму з
+     * {@code PursuitEnemyMeleeBehavior.tick()} — щоб реальний рух ішов по ТОМУ САМОМУ шляху, який
+     * щойно перевірили на прохідність, а не рахував свій окремий виклик createPath() поверх.
+     */
+    public static Path getOrComputePath(Mob mob, Vec3 chasePos) {
+        BlockPos pathTarget = resolvePathTarget(mob, chasePos);
+        NavCache cache = NAV_CACHE.computeIfAbsent(mob, m -> new NavCache());
+
+        if (cache.tickComputed == mob.tickCount && pathTarget.equals(cache.pathTarget)) {
+            return cache.path;
+        }
+
+        Path path = mob.getNavigation().createPath(pathTarget, 0);
+
+        // [PATH DEBUG] - лишаю (корисно знайшли не я): тепер спрацьовує лише на СПРАВЖНЬОМУ
+        // обчисленні (не на кожному зверненні з різних місць), тож більше не дублюється з
+        // різними результатами для тієї самої цілі того самого тіку.
+        if (path != null && path.getNodeCount() > 0) {
+            Node end = path.getEndNode();
+            debugMsg(mob, String.format(
+                    "[PATH DEBUG] target=%s canReach=%s nodes=%d endNode=(%d,%d,%d)",
+                    pathTarget, path.canReach(), path.getNodeCount(), end.x, end.y, end.z));
+        }
+
+        cache.tickComputed = mob.tickCount;
+        cache.pathTarget = pathTarget;
+        cache.canReach = path != null && path.canReach();
+        cache.path = path;
+        return path;
+    }
+
+    /**
+     * Чисто "чи існує прохідний шлях" до точки переслідування — без надбавки за висоту з
+     * {@link #isPathBlocked}. Використовується {@link DigThroughWallsGoal}, якому висота не
+     * заважає: копання йде в напрямку цілі незалежно від того, вище вона чи нижче.
      */
     public static boolean isNavigationBlocked(Mob mob, Vec3 chasePos) {
-        Path path = mob.getNavigation().createPath(
-                BlockPos.containing(chasePos), 0);
+        Path path = getOrComputePath(mob, chasePos);
+        boolean rawBlocked = path == null || !path.canReach();
 
-        return path == null || !path.canReach();
+        // ТИМЧАСОВИЙ DEBUG: тільки коли RAW заблоковано (щоб не спамити щотіку в межах
+        // grace-періоду). Дублювання між Goal-ами того самого тіку більше нема - getOrComputePath
+        // сам не рахує двічі, а лог "[PATH DEBUG]" усередині нього теж спрацьовує лише раз.
+        if (rawBlocked) {
+            BlockPos pathTarget = resolvePathTarget(mob, chasePos);
+            BlockPos naiveTarget = BlockPos.containing(chasePos);
+            Player trackedPlayer = PursuitEnemyBehavior.getTrackedPlayer(mob);
+            boolean naivePassable = isPassableColumn(mob.level(), naiveTarget);
+            boolean pathTargetPassable = isPassableColumn(mob.level(), pathTarget);
+            Integer since = NAV_BLOCKED_SINCE_TICK.get(mob);
+            int duration = since != null ? mob.tickCount - since : 0;
+            debugMsg(mob, String.format(
+                    "[DEBUG isNavigationBlocked] RAW=true (canReach=%s вузлів=%s) заблоковано_тіків=%d/%d "
+                            + "naive-блок=%s(прохідна=%s) path-ціль=%s(прохідна=%s) liveChasing=%s "
+                            + "chasePos(дроб)=%.3f,%.3f,%.3f гравець(дроб)=%.3f,%.3f,%.3f моб(дроб)=%.3f,%.3f,%.3f",
+                    path != null && path.canReach(),
+                    path == null ? "-" : String.valueOf(path.getNodeCount()),
+                    duration, PURSUIT_GRACE_PERIOD_TICKS,
+                    naiveTarget, naivePassable, pathTarget, pathTargetPassable,
+                    PursuitEnemyBehavior.isLiveChasing(mob),
+                    chasePos.x, chasePos.y, chasePos.z,
+                    trackedPlayer != null ? trackedPlayer.getX() : -0.0,
+                    trackedPlayer != null ? trackedPlayer.getY() : -0.0,
+                    trackedPlayer != null ? trackedPlayer.getZ() : -0.0,
+                    mob.getX(), mob.getY(), mob.getZ()));
+        }
+
+        return pastGracePeriod(NAV_BLOCKED_SINCE_TICK, mob, rawBlocked);
     }
 
     public static BlockPos findNearestOpenArea(Mob mob, Level level, Vec3 chasePos) {
-        BlockPos center = BlockPos.containing(chasePos);
+        // Той самий getOnPos()-фікс, що й у isNavigationBlocked (через resolvePathTarget) - і та
+        // сама умова isLiveChasing: не підміняти застиглу GOING_TO_LAST_SEEN/SEARCHING точку
+        // живою позицією гравця.
+        BlockPos center = resolvePathTarget(mob, chasePos);
         BlockPos mobPos = mob.blockPosition();
 
         BlockPos best = null;
@@ -75,17 +217,62 @@ public final class EnemyBreak_N_BuildUtils {
             for (int dx = -SEARCH_XZ_RADIUS; dx <= SEARCH_XZ_RADIUS; dx++) {
                 for (int dz = -SEARCH_XZ_RADIUS; dz <= SEARCH_XZ_RADIUS; dz++) {
                     BlockPos candidate = center.offset(dx, dy, dz);
-                    double distSq = mobPos.distSqr(candidate);
 
-                    if (distSq <= MIN_CANDIDATE_DIST_SQ) continue;
-                    if (distSq < bestDistSq && isPassableColumn(level, candidate)) {
-                        bestDistSq = distSq;
+                    // Виключаємо тільки впритул до МОБА (щоб не "знайти" клітинку, на якій він
+                    // уже стоїть) - сам вибір керується відстанню до ЦІЛІ, не до моба (нижче).
+                    if (mobPos.distSqr(candidate) <= MIN_CANDIDATE_DIST_SQ) continue;
+
+                    // ФІКС (був баг): раніше тут стояло mobPos.distSqr(candidate) - шукали
+                    // найближчу прохідну колонку ДО МОБА. На відкритій площі це тривіально
+                    // знаходило точку за крок від моба (він і сам стоїть на прохідній підлозі) -
+                    // моб "доходив" туди за 1 тік, спрацьовував arrived-скид, і Goal
+                    // перезапускався по колу без реального прогресу (105 START/STOP-циклів у
+                    // тестовому лозі біля прірви). Тепер мінімізуємо відстань до ЦІЛІ
+                    // (center=chasePos) - шукаємо найближчу до ГРАВЦЯ прохідну колонку в межах
+                    // вікна пошуку, а не найближчу до моба.
+                    double distSqToTarget = center.distSqr(candidate);
+                    if (distSqToTarget < bestDistSq && isPassableColumn(level, candidate)) {
+                        bestDistSq = distSqToTarget;
                         best = candidate;
                     }
                 }
             }
         }
-        return best != null ? best : center;
+
+        BlockPos result = best != null ? best : center;
+
+        // ТИМЧАСОВИЙ DEBUG: без throttle - показує, чи клітинка САМОГО ГРАВЦЯ (center) прохідна
+        // сама по собі, і чи вона була виключена через близькість до моба (MIN_CANDIDATE_DIST_SQ) -
+        // це прямо перевіряє гіпотезу "чому не обирається клітинка, де стоїть гравець".
+        boolean centerPassable = isPassableColumn(level, center);
+        boolean centerExcluded = mobPos.distSqr(center) <= MIN_CANDIDATE_DIST_SQ;
+        debugMsg(mob, String.format(
+                "[DEBUG findNearestOpenArea] %s центр(=гравець)=%s прохідна=%s виключена_близькістю=%s "
+                        + "зсув_від_гравця=(%d,%d,%d) зсув_від_моба=(%d,%d,%d) результат=%s",
+                best != null ? "знайдено" : "FALLBACK-на-center(нічого не знайдено!)",
+                center, centerPassable, centerExcluded,
+                result.getX() - center.getX(), result.getY() - center.getY(), result.getZ() - center.getZ(),
+                result.getX() - mobPos.getX(), result.getY() - mobPos.getY(), result.getZ() - mobPos.getZ(),
+                result));
+
+        return result;
+    }
+
+    /**
+     * КЕШ createPath() НА ТІК (знайдено користувачем через окремий debug-лог "[PATH DEBUG]"):
+     * {@code mob.getNavigation()} — той самий спільний об'єкт щоразу, а
+     * {@code BuildPathGoal.canUse()} і {@code DigThroughWallsGoal.canUse()} ОБИДВА опитуються
+     * GoalSelector-ом щотіку й ОБИДВА незалежно кличуть createPath() на ньому — навіть коли
+     * жоден не "виграє" пріоритет. Лог показав: два послідовні виклики createPath() з ОДНІЄЮ
+     * й тією ж ціллю в межах одного тіка давали РІЗНІ результати (canReach=true/8 вузлів, потім
+     * canReach=false/22 вузли, інший endNode) — ванільний NodeEvaluator не розрахований на
+     * повторний виклик у тому самому тіку. Тепер рахуємо не більше разу на тік на моба.
+     */
+    private static final class NavCache {
+        int tickComputed = -1;
+        BlockPos pathTarget;
+        boolean canReach;
+        Path path;
     }
 
     private static boolean isPassableColumn(Level level, BlockPos pos) {

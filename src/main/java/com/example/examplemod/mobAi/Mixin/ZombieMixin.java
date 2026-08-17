@@ -39,11 +39,14 @@ public class ZombieMixin {
         );
 
         mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
-        // Пріоритет 1 (вищий за BetterZombieGoalAi на 2) - обидва тримають MOVE+LOOK, і коли
-        // копання дійсно потрібне (шлях заблокований), воно повинне перебивати звичайний рух.
-        // Коли шлях вільний - canUse() тут false, і BetterZombieGoalAi спокійно керує сам.
-        mob.goalSelector.addGoal(1, new BuildPathGoal(mob));
-        mob.goalSelector.addGoal(2, new DigThroughWallsGoal(mob));
-        mob.goalSelector.addGoal(3, new BetterZombieGoalAi(mob, 1.0D));
+        // pursuit=1 (найвищий) - build/dig НІКОЛИ не перебивають його силою. Підтверджено
+        // експериментально: саме примусове переривання прапорців MOVE/LOOK посеред виконання
+        // PursuitEnemyMeleeBehavior ламало трекінг гравця (не кількість викликів createPath() -
+        // кеш сам собою це не виправив). PursuitEnemyMeleeBehavior сам добровільно віддає чергу
+        // (canYieldToTerraforming=true) через чистий stop()/start(), коли шлях дійсно
+        // заблокований довше за grace-період.
+        mob.goalSelector.addGoal(1, new BetterZombieGoalAi(mob, 1.0D));
+        mob.goalSelector.addGoal(2, new BuildPathGoal(mob));
+        mob.goalSelector.addGoal(3, new DigThroughWallsGoal(mob));
     }
 }

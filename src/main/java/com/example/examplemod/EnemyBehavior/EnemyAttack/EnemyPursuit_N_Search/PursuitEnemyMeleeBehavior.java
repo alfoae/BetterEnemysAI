@@ -1,9 +1,12 @@
 package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search;
 
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.EnemyBreak_N_BuildUtils;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
@@ -31,6 +34,7 @@ public class PursuitEnemyMeleeBehavior extends Goal {
     protected final Mob mob;
     protected final double speedModifier;
     private final Predicate<Mob> extraCanUseCondition;
+    private final boolean canYieldToTerraforming;
     private int ticksUntilNextAttack;
 
     public PursuitEnemyMeleeBehavior(Mob mob, double speedModifier) {
@@ -44,28 +48,75 @@ public class PursuitEnemyMeleeBehavior extends Goal {
      *                             {@code m -> true} (або юзай 2-арг конструктор).
      */
     public PursuitEnemyMeleeBehavior(Mob mob, double speedModifier, Predicate<Mob> extraCanUseCondition) {
+        this(mob, speedModifier, extraCanUseCondition, false);
+    }
+
+    /**
+     * @param canYieldToTerraforming true — лише для мобів, яким РЕАЛЬНО додано
+     *                               {@code BuildPathGoal}/{@code DigThroughWallsGoal} (зараз
+     *                               тільки Zombie через {@code BetterZombieGoalAi}). Якщо true,
+     *                               цей Goal сам добровільно зупиняється
+     *                               ({@code canContinueToUse()=false}), коли шлях реально
+     *                               заблокований довше за grace-період — щоб build/dig
+     *                               отримали чергу через ЧИСТИЙ stop()/start(), а не через
+     *                               примусове перехоплення прапорців посеред такту (саме це
+     *                               ламало трекінг гравця — підтверджено A/B тестом). Для
+     *                               решти мобів лишай false (або юзай 2/3-арг конструктор) —
+     *                               інакше цей Goal зупинявся б, коли isPathBlocked()=true, а
+     *                               зупинити НІКОМУ (для них build/dig не зареєстровані), і
+     *                               моб просто застигав би замість спроби йти звичайним шляхом.
+     */
+    public PursuitEnemyMeleeBehavior(Mob mob, double speedModifier, Predicate<Mob> extraCanUseCondition,
+                                     boolean canYieldToTerraforming) {
         this.mob = mob;
         this.speedModifier = speedModifier;
         this.extraCanUseCondition = extraCanUseCondition;
+        this.canYieldToTerraforming = canYieldToTerraforming;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
     @Override
     public boolean canUse() {
-        // Активуємось коли є ціль в пам'яті PursuitEnemyBehavior — це охоплює і
-        // звичайний бій впритул (CHASING стартує одразу, як тільки ціль в FOLLOW_RANGE),
-        // і погоню крізь стіни/по пам'яті. Плюс додаткова умова (за замовчуванням завжди true).
-        return this.extraCanUseCondition.test(this.mob)
+        boolean yieldToTerraforming = this.shouldYieldToTerraforming();
+        boolean result = this.extraCanUseCondition.test(this.mob)
                 && !this.shouldYield()
+                && !yieldToTerraforming
                 && PursuitEnemyBehavior.getChasePosition(this.mob) != null;
+        // ТИМЧАСОВИЙ DEBUG: без throttle - рідкісна подія (раз на весь епізод переслідування),
+        // варто бачити кожного разу. Якщо ЦЕ раптом = false довго поки моб на вигляд атакує -
+        // цей Goal взагалі не стартує, і вся справа деінде.
+        if (!result) {
+            Player p = PursuitEnemyBehavior.getTrackedPlayer(this.mob);
+            if (p != null) {
+                PursuitEnemyBehavior.debugMsg(p, "[DEBUG PursuitEnemyMeleeBehavior] canUse()=false. "
+                        + "chasePos=" + PursuitEnemyBehavior.getChasePosition(this.mob)
+                        + " shouldYield=" + this.shouldYield()
+                        + " yieldToTerraforming=" + yieldToTerraforming + " моб=" + this.mob.blockPosition());
+            }
+        }
+        return result;
     }
 
     @Override
     public boolean canContinueToUse() {
-        return this.extraCanUseCondition.test(this.mob)
+        boolean yieldToTerraforming = this.shouldYieldToTerraforming();
+        boolean result = this.extraCanUseCondition.test(this.mob)
                 && !this.shouldYield()
+                && !yieldToTerraforming
                 && (PursuitEnemyBehavior.getChasePosition(this.mob) != null
                 || !this.mob.getNavigation().isDone());
+        // ТИМЧАСОВИЙ DEBUG: без throttle - показує ТОЧНИЙ момент STOP і чому саме.
+        if (!result) {
+            Player p = PursuitEnemyBehavior.getTrackedPlayer(this.mob);
+            if (p != null) {
+                PursuitEnemyBehavior.debugMsg(p, "[DEBUG PursuitEnemyMeleeBehavior] canContinueToUse()=false -> STOP. "
+                        + "chasePos=" + PursuitEnemyBehavior.getChasePosition(this.mob)
+                        + " navigation.isDone()=" + this.mob.getNavigation().isDone()
+                        + " shouldYield=" + this.shouldYield()
+                        + " yieldToTerraforming=" + yieldToTerraforming + " моб=" + this.mob.blockPosition());
+            }
+        }
+        return result;
     }
 
     /**
@@ -94,11 +145,37 @@ public class PursuitEnemyMeleeBehavior extends Goal {
         return this.mob.distanceToSqr(target) <= yieldDistSq;
     }
 
+    /**
+     * Чи слід ЦЬОМУ Goal-у самому зупинитись, щоб дати чергу build/dig
+     * ({@code BuildPathGoal}/{@code DigThroughWallsGoal}) — лише коли
+     * {@link #canYieldToTerraforming} увімкнено (тобто ці Goal-и РЕАЛЬНО зареєстровані на
+     * цьому мобі) і шлях дійсно заблокований довше за grace-період
+     * ({@link EnemyBreak_N_BuildUtils#isPathBlocked} вже враховує grace-період сам). Навмисно
+     * НЕ форсимо це через пріоритет Goal-ів (build/dig раніше примусово перебивали цей Goal по
+     * прапорцях — і саме це ламало трекінг гравця, підтверджено A/B тестом; тепер pursuit сам
+     * чемно звільняє прапорці, а не його виривають посеред такту).
+     */
+    private boolean shouldYieldToTerraforming() {
+        if (!this.canYieldToTerraforming) {
+            return false;
+        }
+        Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
+        if (chasePos == null) {
+            return false;
+        }
+        return EnemyBreak_N_BuildUtils.isPathBlocked(this.mob, chasePos);
+    }
+
     @Override
     public void start() {
         super.start();
         this.mob.setAggressive(true);
         this.ticksUntilNextAttack = 0;
+        // ТИМЧАСОВИЙ DEBUG
+        Player p = PursuitEnemyBehavior.getTrackedPlayer(this.mob);
+        if (p != null) {
+            PursuitEnemyBehavior.debugMsg(p, "[DEBUG PursuitEnemyMeleeBehavior] START моб=" + this.mob.blockPosition());
+        }
     }
 
     @Override
@@ -106,6 +183,11 @@ public class PursuitEnemyMeleeBehavior extends Goal {
         super.stop();
         this.mob.setAggressive(false);
         this.mob.setSprinting(false);
+        // ТИМЧАСОВИЙ DEBUG: до navigation().stop(), щоб побачити останній реальний шлях.
+        Player p = PursuitEnemyBehavior.getTrackedPlayer(this.mob);
+        if (p != null) {
+            PursuitEnemyBehavior.debugMsg(p, "[DEBUG PursuitEnemyMeleeBehavior] STOP моб=" + this.mob.blockPosition());
+        }
         this.mob.getNavigation().stop();
     }
 
@@ -131,7 +213,17 @@ public class PursuitEnemyMeleeBehavior extends Goal {
         // код лазив у гілку "жива позиція", намагаючись прокласти шлях за межу дальності
         // навігатора, а vanilla pathfinding такий довгий шлях просто не будує — моб стояв на
         // місці. chasePos сам по собі завжди в розумній (досяжній) відстані для поточного стану.
-        this.mob.getNavigation().moveTo(chasePos.x, chasePos.y, chasePos.z, sprintSpeed);
+        //
+        // ВАЖЛИВО: раніше тут був прямий moveTo(chasePos.x, chasePos.y, chasePos.z, sprintSpeed) -
+        // а BuildPathGoal/DigThroughWallsGoal.canUse() (опитуються GoalSelector-ом ЩОТІКУ,
+        // навіть коли не виграють пріоритет) окремо кличуть createPath() на ТОМУ Ж навігаторі
+        // через EnemyBreak_N_BuildUtils. Три незалежні виклики createPath() на спільному
+        // об'єкті в одному тіку - ванільний NodeEvaluator не розрахований на це (підтверджено
+        // "[PATH DEBUG]" логом: різні результати для тієї самої цілі того самого тіку). Тепер
+        // беремо ГОТОВИЙ Path із того самого спільного кешу, яким користуються і Build/Dig -
+        // реальний createPath() рахується не більше разу на тік на моба, хто б не питав першим.
+        Path sharedPath = EnemyBreak_N_BuildUtils.getOrComputePath(this.mob, chasePos);
+        this.mob.getNavigation().moveTo(sharedPath, sprintSpeed);
         this.mob.getLookControl().setLookAt(
                 chasePos.x, chasePos.y + this.mob.getBbHeight() * 0.5, chasePos.z, 30.0F, 30.0F);
         this.mob.setSprinting(true);
@@ -139,6 +231,22 @@ public class PursuitEnemyMeleeBehavior extends Goal {
         // А атака — дійсно тільки коли реально бачимо ціль, незалежно від того, з якого
         // стану взявся chasePos.
         boolean canSee = target != null && this.mob.getSensing().hasLineOfSight(target);
+
+        // ТИМЧАСОВИЙ DEBUG: heartbeat раз/сек - живий chasePos (яким щотіку годуємо moveTo) і
+        // canSee (від нього залежить, чи взагалі викликається tryAttack нижче). Якщо в чаті
+        // видно ЦЕ повідомлення з canSee=true, але немає повідомлень з tryAttack нижче - справа
+        // в дистанції/кулдауні, а не у видимості.
+        if (this.mob.tickCount % 5 == 0) {
+            Player debugPlayer = PursuitEnemyBehavior.getTrackedPlayer(this.mob);
+            if (debugPlayer != null) {
+                PursuitEnemyBehavior.debugMsg(debugPlayer, String.format(
+                        "[DEBUG PursuitEnemyMeleeBehavior] моб=%.1f %.1f %.1f chasePos=%.1f %.1f %.1f canSee=%s ціль=%s",
+                        this.mob.getX(), this.mob.getY(), this.mob.getZ(),
+                        chasePos.x, chasePos.y, chasePos.z, canSee,
+                        target != null ? target.getName().getString() : "null"));
+            }
+        }
+
         if (canSee) {
             this.tryAttack(target);
         }
@@ -149,10 +257,28 @@ public class PursuitEnemyMeleeBehavior extends Goal {
             return;
         }
         double distSq = this.mob.distanceToSqr(target.getX(), target.getY(), target.getZ());
-        if (distSq <= this.getAttackReachSqr(target) && this.ticksUntilNextAttack <= 0) {
+        double reachSq = this.getAttackReachSqr(target);
+        boolean inRange = distSq <= reachSq;
+        boolean offCooldown = this.ticksUntilNextAttack <= 0;
+        if (inRange && offCooldown) {
             this.ticksUntilNextAttack = this.getAttackIntervalTicks();
             this.mob.swing(InteractionHand.MAIN_HAND);
             this.mob.doHurtTarget(target);
+            // ТИМЧАСОВИЙ DEBUG
+            if (target instanceof Player p) {
+                PursuitEnemyBehavior.debugMsg(p, "[DEBUG PursuitEnemyMeleeBehavior] УДАР! dist="
+                        + String.format("%.2f", Math.sqrt(distSq)));
+            }
+        } else if (target instanceof Player p && this.mob.tickCount % 20 == 0) {
+            // ТИМЧАСОВИЙ DEBUG: canSee=true, але удару немає - ось точна причина (дистанція чи
+            // кулдаун). Саме цей лог має пояснити кейс "агриться, але не бʼє" (якщо
+            // PursuitEnemyMeleeBehavior взагалі встигає тікати - див. лог активності
+            // BuildPathGoal/DigThroughWallsGoal вище: вони мають вищий пріоритет і за спільними
+            // прапорцями MOVE/LOOK можуть не пускати цей Goal тікати ВЗАГАЛІ, тоді цього
+            // повідомлення не буде в чаті, і причина не тут, а в тому, що цей tick() не викликався).
+            PursuitEnemyBehavior.debugMsg(p, String.format(
+                    "[DEBUG PursuitEnemyMeleeBehavior] canSee=true, АЛЕ не бʼю: dist=%.2f reach=%.2f inRange=%s cooldown=%d",
+                    Math.sqrt(distSq), Math.sqrt(reachSq), inRange, this.ticksUntilNextAttack));
         }
     }
 

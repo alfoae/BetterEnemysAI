@@ -6,6 +6,8 @@ import net.minecraft.world.entity.monster.Zombie;
 public class BetterZombieGoalAi extends PursuitEnemyMeleeBehavior {
 
     public BetterZombieGoalAi(Zombie mob, double speedModifier) {
-        super(mob, speedModifier);
+        // canYieldToTerraforming=true — Zombie єдиний зараз має BuildPathGoal/DigThroughWallsGoal
+        // (див. ZombieMixin), тож лише тут є кому передати чергу, коли цей Goal сам зупиняється.
+        super(mob, speedModifier, m -> true, true);
     }
 }

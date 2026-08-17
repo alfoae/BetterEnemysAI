@@ -56,7 +56,17 @@ public class BuildPathGoal extends Goal {
         if (!EnemyBreak_N_BuildUtils.isPathBlocked(this.mob, chasePos)) return false;
 
         BlockPos target = EnemyBreak_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
-        return needsClimb(target) || needsBridge(level, target);
+        boolean climb = needsClimb(target);
+        boolean bridge = !climb && needsBridge(level, target);
+        // ТИМЧАСОВИЙ DEBUG: canUse() перевіряється щотіку, поки Goal НЕ активний - throttle
+        // через tickCount, інакше зафлудить чат поки шлях постійно "заблокований", але Goal
+        // з якоїсь причини не стартує (canUse true, але щось конфліктує по прапорцях).
+        if (this.mob.tickCount % 20 == 0) {
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] canUse(): target=" + target
+                    + " needsClimb=" + climb + " needsBridge=" + bridge
+                    + " -> canUse=" + (climb || bridge));
+        }
+        return climb || bridge;
     }
 
     @Override
@@ -70,10 +80,15 @@ public class BuildPathGoal extends Goal {
         this.retargetTimer = 0;
         this.stuckCheckTimer = STUCK_CHECK_INTERVAL_TICKS;
         this.actionCooldown = 0;
+        // ТИМЧАСОВИЙ DEBUG
+        EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] START моб=" + this.mob.blockPosition());
     }
 
     @Override
     public void stop() {
+        // ТИМЧАСОВИЙ DEBUG: лог ДО обнулення buildTarget, інакше в повідомленні буде null.
+        EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] STOP. Був target=" + this.buildTarget
+                + " моб=" + this.mob.blockPosition());
         this.buildTarget = null;
         this.mob.getNavigation().stop();
     }
@@ -89,13 +104,23 @@ public class BuildPathGoal extends Goal {
         }
 
         if (--this.retargetTimer <= 0 || this.buildTarget == null) {
+            BlockPos oldTarget = this.buildTarget; // ТИМЧАСОВИЙ DEBUG
             this.buildTarget = EnemyBreak_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
             this.retargetTimer = RETARGET_INTERVAL_TICKS;
+            // ТИМЧАСОВИЙ DEBUG: показує СТАРУ і НОВУ ціль поруч - якщо вони сильно "стрибають"
+            // між ретаргетами (замість поступового наближення), це і є ефект "то туди, то назад".
+            if (oldTarget != null && !oldTarget.equals(this.buildTarget)) {
+                EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] RETARGET "
+                        + oldTarget + " -> " + this.buildTarget);
+            }
         }
 
         if (--this.stuckCheckTimer <= 0) {
             this.stuckCheckTimer = STUCK_CHECK_INTERVAL_TICKS;
             if (!EnemyBreak_N_BuildUtils.isPathBlocked(this.mob, chasePos)) {
+                // ТИМЧАСОВИЙ DEBUG
+                EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] СКИДАННЯ (stuckCheck): "
+                        + "шлях більше не заблокований. target=" + this.buildTarget);
                 this.buildTarget = null;
                 return;
             }
@@ -103,8 +128,20 @@ public class BuildPathGoal extends Goal {
 
         if (this.mob.blockPosition().distSqr(this.buildTarget) <= ARRIVED_DIST_SQ
                 && !EnemyBreak_N_BuildUtils.isPathBlocked(this.mob, chasePos)) {
+            // ТИМЧАСОВИЙ DEBUG: якщо ЦЕ спрацьовує майже одразу після старту - схоже на кейс
+            // "добіг до найближчої точки, миттєво вирішив що прийшов, і все скинулось".
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] СКИДАННЯ (arrived): "
+                    + "моб=" + this.mob.blockPosition() + " target=" + this.buildTarget);
             this.buildTarget = null;
             return;
+        }
+
+        // ТИМЧАСОВИЙ DEBUG: heartbeat раз/сек поки Goal активний.
+        if (this.mob.tickCount % 20 == 0) {
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, String.format(
+                    "[DEBUG BuildPathGoal] активний. моб=%s target=%s chasePos=(%.1f,%.1f,%.1f) climb=%s onGround=%s",
+                    this.mob.blockPosition(), this.buildTarget, chasePos.x, chasePos.y, chasePos.z,
+                    needsClimb(this.buildTarget), this.mob.onGround()));
         }
 
         this.mob.getLookControl().setLookAt(
@@ -158,6 +195,7 @@ public class BuildPathGoal extends Goal {
         // Спочатку прибираємо перепону над головою, якщо є ("якщо перекриває блок - ламає") -
         // інакше стрибок все одно вдариться об стелю і нічого не дасть.
         if (EnemyBreak_N_BuildUtils.isBreakable(level, overhead)) {
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] climb: ламаю стелю " + overhead); // DEBUG
             EnemyBreak_N_BuildUtils.breakBlock(level, overhead, this.mob);
             return;
         }
@@ -166,6 +204,7 @@ public class BuildPathGoal extends Goal {
         // тут лишається тільки сам стрибок, і тільки коли моб дійсно стоїть на землі (інакше
         // getJumpControl().jump() посеред польоту нічого не змінює).
         if (this.mob.onGround()) {
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] climb: стрибок з " + feet); // DEBUG
             this.mob.getJumpControl().jump();
         }
     }
@@ -175,6 +214,8 @@ public class BuildPathGoal extends Goal {
         BlockPos stepBelow = step.below();
 
         if (!level.getBlockState(stepBelow).isSolid()) {
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] bridge: ставлю блок " + stepBelow
+                    + " (крок " + step + ")"); // DEBUG
             EnemyBreak_N_BuildUtils.placeBlock(level, stepBelow);
         }
     }

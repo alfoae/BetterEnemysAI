@@ -134,6 +134,19 @@ public class PursuitEnemyBehavior extends Goal {
     }
 
     /**
+     * Чи {@link #getChasePosition} зараз повертає ЖИВУ позицію гравця (стан CHASING), на
+     * відміну від застиглої точки (GOING_TO_LAST_SEEN — {@code lastSeenPos}, SEARCHING —
+     * {@code searchPoint}). Потрібно там, де хочеться "уточнити" позицію через щось живе
+     * (наприклад {@code Player#getOnPos()}) — таке уточнення коректне лише під час CHASING;
+     * підставляти живу позицію гравця замість НАВМИСНО застиглої точки під час
+     * GOING_TO_LAST_SEEN — це і є той бага, який ламав "переслідування по пам'яті".
+     */
+    public static boolean isLiveChasing(Mob mob) {
+        MemoryData data = MEMORY.get(mob);
+        return data != null && data.state == State.CHASING;
+    }
+
+    /**
      * Гравець, якого зараз реально тримає ця система пам'яті (тобто {@code data.trackedPlayer}),
      * АБО {@code null}, якщо системи немає чи вона вже в стані FORGOTTEN (тобто "забула" — далі
      * рішення повністю за звичайним ванільним/Brain-таргетингом мобу).
@@ -200,9 +213,10 @@ public class PursuitEnemyBehavior extends Goal {
 
     /**
      * ТИМЧАСОВИЙ DEBUG-ЛОГ: відправляє повідомлення в чат гравцю-цілі.
-     * Видалити всі виклики debugMsg (і сам метод) після завершення тестування.
+     * public — щоб {@code EnemyBreak_N_BuildUtils} (інший пакет) міг переюзати цей самий метод
+     * замість власної копії. Видалити всі виклики debugMsg (і сам метод) після завершення тестування.
      */
-    private static void debugMsg(Player player, String msg) {
+    public static void debugMsg(Player player, String msg) {
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal(msg));
     }
 
@@ -278,7 +292,22 @@ public class PursuitEnemyBehavior extends Goal {
 
     @Override
     public void tick() {
+        boolean isNewEntry = !MEMORY.containsKey(this.mob); // ТИМЧАСОВИЙ DEBUG
         MemoryData data = MEMORY.computeIfAbsent(this.mob, m -> new MemoryData());
+
+        // ТИМЧАСОВИЙ DEBUG: перший тік цього моба у всій системі памʼяті - показує, чи взагалі
+        // (і коли) моб потрапляє в цю систему, і чи вже стоїть ванільна mob.getTarget() на той
+        // момент (вона потрібна, щоб canUse()/findCandidatePlayer() спрацювали).
+        if (isNewEntry) {
+            Player vanillaTarget = (this.mob.getTarget() instanceof Player p) ? p : null;
+            if (vanillaTarget != null) {
+                debugMsg(vanillaTarget, "[DEBUG] Перший тік памʼяті. mob.getTarget()="
+                        + vanillaTarget.getName().getString() + " моб=" + this.mob.blockPosition());
+            } else if (!this.mob.level().players().isEmpty()) {
+                debugMsg(this.mob.level().players().get(0),
+                        "[DEBUG] Перший тік памʼяті, АЛЕ mob.getTarget()=null. моб=" + this.mob.blockPosition());
+            }
+        }
 
         // GOING_TO_LAST_SEEN і SEARCHING мають свою окрему логіку тіку.
         if (data.state == State.GOING_TO_LAST_SEEN) {
@@ -296,6 +325,16 @@ public class PursuitEnemyBehavior extends Goal {
 
         Player player = findCandidatePlayer();
         if (player == null) {
+            // ТИМЧАСОВИЙ DEBUG: throttled - якщо це спливає довго поки моб явно атакує на
+            // вигляд, значить mob.getTarget() (ВАНІЛЬНА ціль) чомусь не встановлена або
+            // невалідна (isValidTarget: не спектатор/креатив, живий) - уся система пам'яті
+            // залежить від неї як від точки входу.
+            if (this.mob.tickCount % 20 == 0 && !this.mob.level().players().isEmpty()) {
+                debugMsg(this.mob.level().players().get(0), String.format(
+                        "[DEBUG] findCandidatePlayer()=null. mob.getTarget()=%s стан_памяті=%s моб=%s",
+                        this.mob.getTarget() != null ? this.mob.getTarget().getName().getString() : "null",
+                        data.state, this.mob.blockPosition()));
+            }
             if (!supportsSearchBehavior) {
                 this.mob.setSprinting(false);
             }
@@ -334,6 +373,18 @@ public class PursuitEnemyBehavior extends Goal {
             // Оновлюємо lastVisiblePos ТІЛЬКИ коли моб реально бачить гравця (не через стіну).
             if (this.mob.getSensing().hasLineOfSight(player)) {
                 data.lastVisiblePos = player.position();
+            }
+
+            // ТИМЧАСОВИЙ DEBUG: раз на секунду під час CHASING - жива дистанція проти
+            // FOLLOW_RANGE і жива позиція гравця, якою зараз годується getChasePosition().
+            // Мета: підтвердити, що стан справді лишається CHASING (а не десь непомітно
+            // перескакує в GOING_TO_LAST_SEEN) поки гравець рухається "на тій самій висоті".
+            if (this.mob.tickCount % 20 == 0) {
+                debugMsg(player, String.format(
+                        "[DEBUG] CHASING. dist=%.1f/%.1f(follow) моб=%.1f %.1f %.1f гравець=%.1f %.1f %.1f",
+                        Math.sqrt(distSq), followRange,
+                        this.mob.getX(), this.mob.getY(), this.mob.getZ(),
+                        player.getX(), player.getY(), player.getZ()));
             }
         } else if (data.state == State.CHASING) {
             // Вийшов за межі FOLLOW_RANGE — фіксуємо ОСТАННЮ ВИДИМУ позицію (не поточну!).
@@ -533,6 +584,15 @@ public class PursuitEnemyBehavior extends Goal {
     }
 
     private void forgetInternal(MemoryData data) {
+        // ТИМЧАСОВИЙ DEBUG: логуємо ДО занулення - це єдина спільна точка входу в FORGOTTEN з
+        // усіх гілок (GOING_TO_LAST_SEEN/SEARCHING/тощо), тож без потреби латати кожен виклик
+        // forgetInternal(...) окремо. Якщо це спрацьовує часто і одразу після - показує, що
+        // моб постійно "забуває" гравця замість стабільного відстеження.
+        if (data.trackedPlayer != null) {
+            debugMsg(data.trackedPlayer, "[DEBUG] FORGOTTEN. Був стан=" + data.state
+                    + " trackedPlayer=" + data.trackedPlayer.getName().getString()
+                    + " моб=" + this.mob.blockPosition());
+        }
         data.state = State.FORGOTTEN;
         data.trackedPlayer = null;
         data.lastVisiblePos = null;

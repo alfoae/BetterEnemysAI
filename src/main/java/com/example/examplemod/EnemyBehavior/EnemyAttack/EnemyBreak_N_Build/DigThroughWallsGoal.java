@@ -56,7 +56,14 @@ public class DigThroughWallsGoal extends Goal {
         Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
         if (chasePos == null) return false;
 
-        return EnemyBreak_N_BuildUtils.isNavigationBlocked(this.mob, chasePos);
+        boolean blocked = EnemyBreak_N_BuildUtils.isNavigationBlocked(this.mob, chasePos);
+        // ТИМЧАСОВИЙ DEBUG: throttle через tickCount - canUse() опитується щотіку, поки Goal
+        // не активний.
+        if (blocked && this.mob.tickCount % 20 == 0) {
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG DigThroughWallsGoal] canUse()=true, "
+                    + "chasePos=" + BlockPos.containing(chasePos) + " моб=" + this.mob.blockPosition());
+        }
+        return blocked;
     }
 
     @Override
@@ -73,10 +80,15 @@ public class DigThroughWallsGoal extends Goal {
         this.stuckCheckTimer = STUCK_CHECK_INTERVAL_TICKS;
         this.currentlyBreaking = null;
         this.breakProgressTicks = 0;
+        // ТИМЧАСОВИЙ DEBUG
+        EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG DigThroughWallsGoal] START моб=" + this.mob.blockPosition());
     }
 
     @Override
     public void stop() {
+        // ТИМЧАСОВИЙ DEBUG: лог ДО обнулення digTarget.
+        EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG DigThroughWallsGoal] STOP. Був target=" + this.digTarget
+                + " моб=" + this.mob.blockPosition());
         this.digTarget = null;
         this.currentlyBreaking = null;
         this.breakProgressTicks = 0;
@@ -94,8 +106,13 @@ public class DigThroughWallsGoal extends Goal {
         }
 
         if (--this.retargetTimer <= 0 || this.digTarget == null) {
+            BlockPos oldTarget = this.digTarget; // ТИМЧАСОВИЙ DEBUG
             this.digTarget = EnemyBreak_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
             this.retargetTimer = RETARGET_INTERVAL_TICKS;
+            if (oldTarget != null && !oldTarget.equals(this.digTarget)) {
+                EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG DigThroughWallsGoal] RETARGET "
+                        + oldTarget + " -> " + this.digTarget);
+            }
         }
 
         // Періодично перепровіряємо, чи шлях і досі заблокований (наприклад, гравець сам
@@ -105,6 +122,9 @@ public class DigThroughWallsGoal extends Goal {
         if (--this.stuckCheckTimer <= 0) {
             this.stuckCheckTimer = STUCK_CHECK_INTERVAL_TICKS;
             if (!EnemyBreak_N_BuildUtils.isNavigationBlocked(this.mob, chasePos)) {
+                // ТИМЧАСОВИЙ DEBUG
+                EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG DigThroughWallsGoal] СКИДАННЯ (stuckCheck): "
+                        + "шлях більше не заблокований. target=" + this.digTarget);
                 this.digTarget = null;
                 return;
             }
@@ -112,6 +132,9 @@ public class DigThroughWallsGoal extends Goal {
 
         if (this.mob.blockPosition().distSqr(this.digTarget) <= ARRIVED_DIST_SQ
                 && !EnemyBreak_N_BuildUtils.isNavigationBlocked(this.mob, chasePos)) {
+            // ТИМЧАСОВИЙ DEBUG
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG DigThroughWallsGoal] СКИДАННЯ (arrived): "
+                    + "моб=" + this.mob.blockPosition() + " target=" + this.digTarget);
             this.digTarget = null;
             return;
         }
@@ -119,16 +142,31 @@ public class DigThroughWallsGoal extends Goal {
         if (this.currentlyBreaking == null) {
             this.currentlyBreaking = pickNextBlockToBreak(level);
             this.breakProgressTicks = 0;
+            // ТИМЧАСОВИЙ DEBUG: якщо currentlyBreaking постійно лишається null, поки Goal
+            // активний - моб "стоїть і копає повітря", саме кейс "агриться, але не бʼє".
+            if (this.mob.tickCount % 20 == 0) {
+                EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG DigThroughWallsGoal] pickNextBlockToBreak() -> "
+                        + this.currentlyBreaking + " (target=" + this.digTarget + ")");
+            }
         }
 
         if (this.currentlyBreaking != null) {
             this.breakProgressTicks++;
             int ticksNeeded = MiningTierData.get(level.getServer()).getTicksPerBlock();
             if (this.breakProgressTicks >= ticksNeeded) {
+                EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG DigThroughWallsGoal] ламаю блок "
+                        + this.currentlyBreaking); // ТИМЧАСОВИЙ DEBUG
                 EnemyBreak_N_BuildUtils.breakBlock(level, this.currentlyBreaking, this.mob);
                 this.currentlyBreaking = null;
                 this.breakProgressTicks = 0;
             }
+        }
+
+        // ТИМЧАСОВИЙ DEBUG: heartbeat раз/сек поки Goal активний.
+        if (this.mob.tickCount % 20 == 0) {
+            EnemyBreak_N_BuildUtils.debugMsg(this.mob, String.format(
+                    "[DEBUG DigThroughWallsGoal] активний. моб=%s target=%s currentlyBreaking=%s chasePos=(%.1f,%.1f,%.1f)",
+                    this.mob.blockPosition(), this.digTarget, this.currentlyBreaking, chasePos.x, chasePos.y, chasePos.z));
         }
 
         this.mob.getLookControl().setLookAt(
