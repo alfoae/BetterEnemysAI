@@ -17,6 +17,23 @@ public class Config {
     public static final ModConfigSpec.IntValue PLACED_BLOCK_LIFETIME_SECONDS;
     public static final ModConfigSpec.BooleanValue PLACED_BLOCK_DROPS_WHEN_BROKEN;
 
+    // Фаза 1 "зони переслідування вгору" (площа гравця + радіус атаки) — див. TowerZoneData.
+    public static final ModConfigSpec.IntValue TOWER_ZONE_SCAN_RADIUS;
+    public static final ModConfigSpec.IntValue TOWER_ZONE_GAP_MERGE_BLOCKS;
+    public static final ModConfigSpec.IntValue TOWER_ZONE_REACH_CAP;
+
+    // Фаза 4, клатч (див. MobClutchRecovery) - шанс УСПІШНО виконати кожну конкретну спробу.
+    public static final ModConfigSpec.DoubleValue CLUTCH_FIRST_ATTEMPT_CHANCE;
+    public static final ModConfigSpec.DoubleValue CLUTCH_SECOND_ATTEMPT_CHANCE;
+    public static final ModConfigSpec.DoubleValue CLUTCH_FINAL_ATTEMPT_CHANCE;
+
+    // Фаза 4, нейтралізація гравецьких хазардів (див. PlacedHazardRegistry).
+    public static final ModConfigSpec.IntValue PLAYER_HAZARD_MEMORY_SECONDS;
+
+    // "у ванілі у гравця є задержка перед установкою блока" - той самий принцип для мобів,
+    // рахується на рівні самого API постановки блоку (EnemyBreak_N_BuildUtils.placeBlock).
+    public static final ModConfigSpec.IntValue MOB_PLACE_DELAY_TICKS;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -60,6 +77,66 @@ public class Config {
                 .comment("Чи випадає предмет, якщо гравець зламає блок, поставлений мобом ",
                         "(поки той ще не зник сам) (true/false).")
                 .define("placedBlockDropsWhenBroken", false);
+
+        builder.pop();
+
+        builder.push("Tower_Assault_Zone");
+
+        TOWER_ZONE_SCAN_RADIUS = builder
+                .comment("Радіус (у блоках) від гравця, в межах якого моб сканує його площу ",
+                        "(платформу), щоб порахувати зону, яку треба обходити під час підйому.")
+                .defineInRange("towerZoneScanRadius", 12, 4, 24);
+
+        TOWER_ZONE_GAP_MERGE_BLOCKS = builder
+                .comment("Максимальний розрив (у блоках) між сусідніми ділянками площі, який ",
+                        "сканування ще вважає з'єднаним (гравець міг перестрибнути).")
+                .defineInRange("towerZoneGapMergeBlocks", 4, 0, 8);
+
+        TOWER_ZONE_REACH_CAP = builder
+                .comment("Стеля (у блоках) на РОЗМІР буферної зони навколо площі гравця. НЕ ",
+                        "обмежує саму перевірку 'чи гравець зараз дістане мене' (та завжди ",
+                        "рахується з реального, некапнутого значення атрибута reach) — лише те, ",
+                        "наскільки великий периметр моб ЗАЗДАЛЕГІДЬ планує обходити. Захист від ",
+                        "того, що модовий предмет з reach=64 змусить моба будувати структуру на ",
+                        "десятки блоків в обхід.")
+                .defineInRange("towerZoneReachCap", 8, 3, 20);
+
+        builder.pop();
+
+        builder.push("Clutch");
+
+        CLUTCH_FIRST_ATTEMPT_CHANCE = builder
+                .comment("Шанс, що моб, щойно збитий з опори (наприклад стрілою), одразу ",
+                        "успішно підставить блок під себе (миттєва 'рефлекторна' спроба).")
+                .defineInRange("clutchFirstAttemptChance", 0.70, 0.0, 1.0);
+
+        CLUTCH_SECOND_ATTEMPT_CHANCE = builder
+                .comment("Те саме, друга спроба (якщо перша не спрацювала/не мала до чого ",
+                        "приліпитись) - моб уже летить далі, тому надійність нижча.")
+                .defineInRange("clutchSecondAttemptChance", 0.20, 0.0, 1.0);
+
+        CLUTCH_FINAL_ATTEMPT_CHANCE = builder
+                .comment("Обидві миттєві спроби провалились - моб націлюється на розраховану ",
+                        "точку падіння заздалегідь (більше часу на підготовку - вищий шанс).")
+                .defineInRange("clutchFinalAttemptChance", 0.90, 0.0, 1.0);
+
+        builder.pop();
+
+        builder.push("Placed_Hazards");
+
+        PLAYER_HAZARD_MEMORY_SECONDS = builder
+                .comment("Скільки секунд моб 'пам'ятає', що конкретний блок лави/води/вогню ",
+                        "поставив саме гравець (а не природний) - і тому може його нейтралізувати.")
+                .defineInRange("playerHazardMemorySeconds", 300, 10, 3600);
+
+        builder.pop();
+
+        builder.push("Mob_Place_Delay");
+
+        MOB_PLACE_DELAY_TICKS = builder
+                .comment("Мінімальна кількість тіків між постановками блоків ОДНИМ мобом - те ",
+                        "саме, що затримка гравця перед установкою блока у ванілі (~4 тіки).")
+                .defineInRange("mobPlaceDelayTicks", 4, 0, 40);
 
         builder.pop();
 

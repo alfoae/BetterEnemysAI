@@ -16,10 +16,12 @@ import java.util.EnumSet;
  * <p>
  * Два режими, обирається щотіку заново залежно від різниці висот з ціллю:
  * <ul>
- *   <li><b>Climb</b> (ціль значно вище — {@link #CLIMB_HEIGHT_THRESHOLD}) — ставить блок під
- *       ноги і стрибає, "піларить" вгору. Якщо щось заважає стрибку (стеля над головою) —
- *       спочатку ламає його ({@link EnemyBreak_N_BuildUtils#isBreakable}/{@link EnemyBreak_N_BuildUtils#breakBlock}),
- *       саме як просив користувач: "якщо перекриває блок — ламає".</li>
+ *   <li><b>Climb</b> (ціль значно вище — {@link EnemyBreak_N_BuildUtils#CLIMB_HEIGHT_THRESHOLD}) —
+ *       ставить блок під ноги і стрибає, "піларить" вгору. Якщо щось заважає стрибку (стеля над
+ *       головою) — спочатку ламає його ({@link EnemyBreak_N_BuildUtils#isBreakable}/{@link EnemyBreak_N_BuildUtils#breakBlock}),
+ *       саме як просив користувач: "якщо перекриває блок — ламає". ТІЛЬКИ під час
+ *       GOING_TO_LAST_SEEN/SEARCHING чи для не-гравця — живе переслідування гравця тепер
+ *       веде {@link TowerClimbGoal}.</li>
  *   <li><b>Bridge</b> (ціль приблизно на тій самій висоті, але попереду яма) — кладе блок під
  *       наступний горизонтальний крок, щоб з'явилась опора, і йде далі.</li>
  * </ul>
@@ -29,7 +31,6 @@ import java.util.EnumSet;
  */
 public class BuildPathGoal extends Goal {
 
-    private static final double CLIMB_HEIGHT_THRESHOLD = 2.0;
     private static final int RETARGET_INTERVAL_TICKS = 40;
     private static final int STUCK_CHECK_INTERVAL_TICKS = 20;
     private static final double ARRIVED_DIST_SQ = 4.0;
@@ -57,6 +58,15 @@ public class BuildPathGoal extends Goal {
 
         BlockPos target = EnemyBreak_N_BuildUtils.findNearestOpenArea(this.mob, level, chasePos);
         boolean climb = needsClimb(target);
+
+        // Підйом до ЖИВОЇ позиції гравця тепер веде TowerClimbGoal (проекція/зона/стіни) - тут
+        // навмисно віддаємо йому чергу (чистий stop()/start(), а не бійка за прапорці по
+        // пріоритету). GOING_TO_LAST_SEEN/SEARCHING лишаються тут: "як можна швидше, ігноруючи
+        // всю логіку зони" - саме так, як просив користувач.
+        if (climb && PursuitEnemyBehavior.isLiveChasing(this.mob)) {
+            return false;
+        }
+
         boolean bridge = !climb && needsBridge(level, target);
         // ТИМЧАСОВИЙ DEBUG: canUse() перевіряється щотіку, поки Goal НЕ активний - throttle
         // через tickCount, інакше зафлудить чат поки шлях постійно "заблокований", але Goal
@@ -72,7 +82,11 @@ public class BuildPathGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (!EnemyBreak_N_BuildUtils.canOperate(this.mob)) return false;
-        return this.buildTarget != null;
+        if (this.buildTarget == null) return false;
+        // Те саме правило, що й у canUse(): якщо мобу знадобився підйом і при цьому вже жива
+        // (не GTLS/SEARCHING) ціль - це тепер територія TowerClimbGoal, віддаємо чергу чистим
+        // stop()-ом, а не тягнемо на собі до кінця підйому.
+        return !needsClimb(this.buildTarget) || !PursuitEnemyBehavior.isLiveChasing(this.mob);
     }
 
     @Override
@@ -158,7 +172,7 @@ public class BuildPathGoal extends Goal {
         if (!this.mob.onGround()) {
             BlockPos below = this.mob.blockPosition().below();
             if (!level.getBlockState(below).isSolid()) {
-                EnemyBreak_N_BuildUtils.placeBlock(level, below);
+                EnemyBreak_N_BuildUtils.placeBlock(level, below, this.mob);
             }
         }
 
@@ -176,7 +190,7 @@ public class BuildPathGoal extends Goal {
     }
 
     private boolean needsClimb(BlockPos target) {
-        return target.getY() - this.mob.blockPosition().getY() >= CLIMB_HEIGHT_THRESHOLD;
+        return EnemyBreak_N_BuildUtils.needsClimb(this.mob, target);
     }
 
     /**
@@ -216,7 +230,7 @@ public class BuildPathGoal extends Goal {
         if (!level.getBlockState(stepBelow).isSolid()) {
             EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG BuildPathGoal] bridge: ставлю блок " + stepBelow
                     + " (крок " + step + ")"); // DEBUG
-            EnemyBreak_N_BuildUtils.placeBlock(level, stepBelow);
+            EnemyBreak_N_BuildUtils.placeBlock(level, stepBelow, this.mob);
         }
     }
 }

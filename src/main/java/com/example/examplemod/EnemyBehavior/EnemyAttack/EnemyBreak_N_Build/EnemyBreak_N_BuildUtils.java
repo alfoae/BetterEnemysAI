@@ -25,6 +25,13 @@ public final class EnemyBreak_N_BuildUtils {
     public static final int SEARCH_XZ_RADIUS = 8;
     public static final int SEARCH_Y_RADIUS = 3;
 
+    /**
+     * Спільний поріг "це вже підйом, а не просто крок вгору" — той самий критерій і для
+     * {@link BuildPathGoal}, і для {@link TowerClimbGoal}, щоб вони ніколи не розходились у
+     * тому, яку саме ситуацію кожен з них вважає "підйомом".
+     */
+    public static final double CLIMB_HEIGHT_THRESHOLD = 2.0;
+
     private static final double MIN_CANDIDATE_DIST_SQ = 4.0;
 
     // АРХІТЕКТУРНИЙ ФІКС (за проханням користувача): build/dig мають бути ІНСТРУМЕНТОМ, який
@@ -106,6 +113,12 @@ public final class EnemyBreak_N_BuildUtils {
         if (!PursuitEnemyBehavior.isMemoryChasing(mob)) return false;
         return !PursuitEnemyBehavior.isSearchModeActive(mob);
     }
+    // Затримка між постановками блоків одним і тим самим мобом - "у ванілі у гравця є задержка
+    // перед установкою блока" (короткий per-mob кулдаун, ОКРЕМИЙ від ACTION_COOLDOWN_TICKS
+    // конкретних Goal-ів: цей рахується на РІВНІ самого API постановки блоку, тож діє
+    // однаково для геть усіх викликів, включно з "аварійними" - ensureFloorUnderneathWhileAirborne
+    // у TowerClimbGoal навмисно не чекає на власний кулдаун Goal-у, бо вікно падіння коротке).
+    private static final Map<Mob, Long> LAST_PLACE_TICK = new WeakHashMap<>();
 
     /**
      * СПІЛЬНИЙ кеш шляху на тік — рахує {@code createPath()} НЕ БІЛЬШЕ РАЗУ на тік на моба,
@@ -308,14 +321,54 @@ public final class EnemyBreak_N_BuildUtils {
         level.destroyBlock(pos, false);
     }
 
-    public static void placeBlock(ServerLevel level, BlockPos pos) {
+    /**
+     * Та сама умова, що раніше жила приватно всередині {@link BuildPathGoal} — винесена сюди,
+     * щоб {@link TowerClimbGoal} перевіряла "це підйом?" ІДЕНТИЧНО, а не своєю копією порогу.
+     */
+    public static boolean needsClimb(Mob mob, BlockPos target) {
+        return target.getY() - mob.blockPosition().getY() >= CLIMB_HEIGHT_THRESHOLD;
+    }
+
+    /**
+     * "не вміти ставити блоки в повітрі... тільки якщо біля нього є інший блок" — усі 6 граней-
+     * сусідів (не по діагоналі — так само суворо, як і в гравця: дотику лише кутом не досить).
+     */
+    public static boolean hasAdjacentSolid(Level level, BlockPos pos) {
+        return level.getBlockState(pos.below()).isSolid()
+                || level.getBlockState(pos.above()).isSolid()
+                || level.getBlockState(pos.north()).isSolid()
+                || level.getBlockState(pos.south()).isSolid()
+                || level.getBlockState(pos.east()).isSolid()
+                || level.getBlockState(pos.west()).isSolid();
+    }
+
+    /**
+     * Ставить блок від імені {@code mob}. Три перевірки, усі "тихі" (просто нічого не робить,
+     * якщо не пройшли) — знайдені живим тестуванням:
+     * <ol>
+     *   <li>НЕ переписує вже існуючий (не-replaceable) блок — {@code canBeReplaced()}, той самий
+     *       критерій, що й у ванільного розміщення, а не вужчий {@code !isSolid()} (який
+     *       пропускав, наприклад, квіти/факели/рейки — вони не "solid", але явно не порожні).</li>
+     *   <li>Не частіше, ніж раз на {@link Config#MOB_PLACE_DELAY_TICKS} тіків для ЦЬОГО моба.</li>
+     *   <li>{@link #hasAdjacentSolid} — інакше не ставить.</li>
+     * </ol>
+     */
+    public static void placeBlock(ServerLevel level, BlockPos pos, Mob mob) {
+        if (!level.getBlockState(pos).canBeReplaced()) return;
+        if (!hasAdjacentSolid(level, pos)) return;
+
+        long now = level.getGameTime();
+        Long lastTick = LAST_PLACE_TICK.get(mob);
+        if (lastTick != null && now - lastTick < Config.MOB_PLACE_DELAY_TICKS.get()) return;
+
         Block block = DigBlockResolver.getDigBlock(level);
         BlockState state = block.defaultBlockState();
 
         level.setBlock(pos, state, 3);
         level.playSound(null, pos, state.getSoundType().getPlaceSound(), SoundSource.HOSTILE, 1.0F, 1.0F);
+        LAST_PLACE_TICK.put(mob, now);
 
-        long expireAt = level.getGameTime() + (long) Config.PLACED_BLOCK_LIFETIME_SECONDS.get() * 20L;
+        long expireAt = now + (long) Config.PLACED_BLOCK_LIFETIME_SECONDS.get() * 20L;
         TemporaryBlockData.get(level).track(pos, expireAt);
     }
 }

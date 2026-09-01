@@ -2,6 +2,7 @@ package com.example.examplemod.mobAi.Mixin;
 
 import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.BuildPathGoal;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.DigThroughWallsGoal;
+import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.TowerClimbGoal;
 import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterZombieGoalAi;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
@@ -46,7 +47,12 @@ public class ZombieMixin {
         // (canYieldToTerraforming=true) через чистий stop()/start(), коли шлях дійсно
         // заблокований довше за grace-період.
         mob.goalSelector.addGoal(1, new BetterZombieGoalAi(mob, 1.0D));
-        mob.goalSelector.addGoal(2, new BuildPathGoal(mob));
-        mob.goalSelector.addGoal(3, new DigThroughWallsGoal(mob));
+        // TowerClimbGoal веде підйом до ЖИВОЇ позиції гравця (проекція/зона/стіни); BuildPathGoal
+        // сам віддає йому чергу в цьому випадку (canUse()/canContinueToUse() повертають false) -
+        // конкретна цифра пріоритету тут другорядна порівняно з тим явним yield-ом, але нижче за
+        // pursuit і вище за "наївний" BuildPathGoal для наочності.
+        mob.goalSelector.addGoal(2, new TowerClimbGoal(mob));
+        mob.goalSelector.addGoal(3, new BuildPathGoal(mob));
+        mob.goalSelector.addGoal(4, new DigThroughWallsGoal(mob));
     }
 }
