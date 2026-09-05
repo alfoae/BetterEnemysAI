@@ -1,5 +1,6 @@
 package com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build;
 
+import com.example.examplemod.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -15,7 +16,10 @@ import java.util.*;
  * "виповзти" далеко за задуманий ліміт.
  * <p>
  * Побічний продукт того самого проходу — пошук повністю суцільного (без жодного розриву,
- * абсолютно рівного) квадрата 7x7 будь-де у відсканованій площі.
+ * абсолютно рівного) квадрата будь-де у відсканованій площі. Історично й далі зветься "7x7" у
+ * коді ({@link #find7x7Center}, {@code full7x7Center} тощо), але фактичний розмір з
+ * {@link Config#TOWER_ZONE_FLAT_PATCH_RADIUS} за замовчуванням МЕНШИЙ (3x3) — див. коментар тієї
+ * константи.
  */
 final class PlatformScanner {
 
@@ -115,11 +119,16 @@ final class PlatformScanner {
     }
 
     /**
-     * Повністю суцільний (жодного розриву) і абсолютно РІВНИЙ (та сама висота) квадрат 7x7.
+     * Повністю суцільний (жодного розриву) і абсолютно РІВНИЙ (та сама висота) квадрат — розмір
+     * керується {@link Config#TOWER_ZONE_FLAT_PATCH_RADIUS} (за замовчуванням радіус 1 = 3x3, не
+     * 7x7 — див. коментар константи: ЖИВИЙ ТЕСТ показав, що вимога рівно 7x7 без жодного розриву
+     * на реальних площадках гравця майже ніколи не справджується, і "короткий" шлях у
+     * {@code TowerClimbGoal} (TO_7X7/CROSS_AND_DIG) просто ніколи не отримує керування).
      */
     private static boolean isFull7x7(Map<Long, Integer> columns, int cx, int cz, int y) {
-        for (int dx = -3; dx <= 3; dx++) {
-            for (int dz = -3; dz <= 3; dz++) {
+        int radius = Config.TOWER_ZONE_FLAT_PATCH_RADIUS.get();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
                 Integer colY = columns.get(key(cx + dx, cz + dz));
                 if (colY == null || colY != y) return false;
             }

@@ -16,16 +16,25 @@ import java.util.concurrent.ConcurrentHashMap;
  * ФАЗА 1 (фундамент): "площа гравця + reach" — зона, яку моб має обходити ЗОВНІ під час підйому,
  * а не впиратися впритул. "reach" тут — {@link PlayerReachUtils#getCombinedRawReach}: БІЛЬШИЙ з
  * радіуса АТАКИ ({@code Attributes.ENTITY_INTERACTION_RANGE}) і радіуса ВЗАЄМОДІЇ З БЛОКАМИ
- * ({@code Attributes.BLOCK_INTERACTION_RANGE}), +1 — а НЕ сам по собі радіус атаки. Цей reach
+ * ({@code Attributes.BLOCK_INTERACTION_RANGE}), +2 — а НЕ сам по собі радіус атаки. Цей reach
  * додається по БОКАХ і ВВЕРХ (буфер площі й дах зони відповідно); ВНИЗ зона нічим не обмежена —
  * (x,z)-колонка, що потрапила в буфер, лишається "в зоні" на будь-якій глибині, а не тільки біля
  * поверхні площі. Спільна на ГРАВЦЯ (не на конкретного моба): будь-який моб, що зараз лізе вгору
  * до того самого гравця, читає й доростає ОДНІ Й ТІ САМІ дані.
  * <p>
- * <b>Монотонне зростання</b> (навмисно): відсканована площа, буферизована (площа+reach) зона і
- * "дах" зони (roofY) можуть тільки РОСТИ. Якщо гравець тимчасово бере предмет, що збільшує
- * {@code Attributes.ENTITY_INTERACTION_RANGE} чи {@code Attributes.BLOCK_INTERACTION_RANGE}, а
- * потім знімає його — зона лишається такою ж великою, ніби предмет і досі надітий.
+ * <b>Два кільця, не одне</b> (живий тест: "моб будується рівно під партиклами"): партикли й
+ * {@link #isInsideZone} показують "чесну" лінію — рахуючи прямо з reach, без запасу.
+ * {@link #isColumnInsideFootprint} (те, що РЕАЛЬНО вирішує, де мобу можна стартувати/лишатись
+ * під час підйому) — на {@link #BUILD_GAP_EXTRA_BLOCKS} ширше. Просто піднявши сам reach, цього
+ * проміжку не отримати: "перша клітинка поза буфером" (де стартує моб) і "остання клітинка в
+ * буфері" (де стоять партикли) СУСІДНІ за побудовою, хай яким великим не рахуй сам reach —
+ * потрібне саме окреме, ширше кільце для рішень підйому.
+ * <p>
+ * <b>Монотонне зростання</b> (навмисно): відсканована площа, обидва буфери (площа+reach і
+ * площа+reach+{@link #BUILD_GAP_EXTRA_BLOCKS}) і "дах" зони (roofY) можуть тільки РОСТИ. Якщо
+ * гравець тимчасово бере предмет, що збільшує {@code Attributes.ENTITY_INTERACTION_RANGE} чи
+ * {@code Attributes.BLOCK_INTERACTION_RANGE}, а потім знімає його — зона лишається такою ж
+ * великою, ніби предмет і досі надітий.
  * <p>
  * <b>Виняток — {@link #full7x7Center}</b>: НЕ монотонне, завжди СВІЖЕ значення з останнього
  * сканування. Це не про безпеку (як решта зони), а про "чи є зараз зручне місце для короткого
@@ -59,8 +68,20 @@ public final class TowerZoneData {
 
     private static final Map<UUID, TowerZoneData> BY_PLAYER = new ConcurrentHashMap<>();
 
+    /**
+     * "щоб він строївся за партиклами, не рівно під ними" — наскільки ширшим за
+     * {@link #bufferedFootprintXZ} (той самий, що бачать партикли) є набір, який РЕАЛЬНО
+     * використовує {@link #isColumnInsideFootprint} для рішень підйому. РІВНО 1 додаткове кільце
+     * клітинок так, щоб моб завжди комітився щонайменше на 1 блок ДАЛІ за лінію партиклів, а не
+     * впритул до неї — інакше "перша клітинка поза буфером" і "остання клітинка в буфері"
+     * (де стоять партикли) за побудовою СУСІДНІ, і жодного видимого проміжку нема, скільки б не
+     * рахувати сам reach.
+     */
+    private static final int BUILD_GAP_EXTRA_BLOCKS = 1;
+
     private final Map<Long, Integer> platformColumns = new HashMap<>();
     private final Set<Long> bufferedFootprintXZ = new HashSet<>();
+    private final Set<Long> buildExclusionXZ = new HashSet<>();
     private final Set<UUID> linkedPlayerIds = new HashSet<>();
     private int roofY = Integer.MIN_VALUE;
     private BlockPos full7x7Center;
@@ -134,6 +155,7 @@ public final class TowerZoneData {
         if (b != null && b != merged) {
             merged.platformColumns.putAll(b.platformColumns);
             merged.bufferedFootprintXZ.addAll(b.bufferedFootprintXZ);
+            merged.buildExclusionXZ.addAll(b.buildExclusionXZ);
             merged.roofY = Math.max(merged.roofY, b.roofY);
             merged.linkedPlayerIds.addAll(b.linkedPlayerIds);
             merged.lastTouchedGameTime = Math.max(merged.lastTouchedGameTime, b.lastTouchedGameTime);
@@ -223,7 +245,7 @@ public final class TowerZoneData {
 
         double attackRange = PlayerReachUtils.getRawEntityInteractionRange(player);
         double blockRange = PlayerReachUtils.getRawBlockInteractionRange(player);
-        double rawReach = PlayerReachUtils.getCombinedRawReach(player); // = max(attackRange, blockRange) + 1
+        double rawReach = PlayerReachUtils.getCombinedRawReach(player); // = max(attackRange, blockRange) + 2
         double cappedReach = PlayerReachUtils.getReachCappedForZoneSizing(player);
         int reachBlocks = (int) Math.ceil(cappedReach);
 
@@ -240,6 +262,8 @@ public final class TowerZoneData {
         this.full7x7Center = result.full7x7Center(); // "живе" значення цього скану, див. джавадок класу
 
         this.bufferedFootprintXZ.addAll(bufferBoundary(this.platformColumns.keySet(), reachBlocks, cappedReach));
+        this.buildExclusionXZ.addAll(bufferBoundary(this.platformColumns.keySet(),
+                reachBlocks + BUILD_GAP_EXTRA_BLOCKS, cappedReach + BUILD_GAP_EXTRA_BLOCKS));
 
         if (scanMaxY != Integer.MIN_VALUE) {
             this.roofY = Math.max(this.roofY, scanMaxY + reachBlocks); // МОНОТОННО - лише max
@@ -249,8 +273,10 @@ public final class TowerZoneData {
     }
 
     /**
-     * Чи ця позиція (будь-який Y ≤ дах) належить накопиченій (монотонній) зоні. Чисто
-     * геометричний факт — виняток "є 7x7, тому не зважай" це рішення Фази 2, не цього шару.
+     * Чи ця позиція (будь-який Y ≤ дах) належить накопиченій (монотонній) зоні — "чесна" лінія,
+     * порахована прямо з reach, БЕЗ {@link #BUILD_GAP_EXTRA_BLOCKS} (та сама, що бачать
+     * партикли). Чисто геометричний факт — виняток "є 7x7, тому не зважай" це рішення Фази 2, не
+     * цього шару.
      */
     public boolean isInsideZone(BlockPos pos) {
         return pos.getY() <= this.roofY
@@ -258,12 +284,16 @@ public final class TowerZoneData {
     }
 
     /**
-     * Те саме, що {@link #isInsideZone}, але без урахування Y — "чи ця (x,z)-колонка взагалі
-     * колись потрапляє в буфер на БУДЬ-ЯКІЙ висоті". Потрібно окремо для пошуку точки старту/виходу
-     * поза проекцією: там важлива сама горизонтальна "тінь" зони, а не поточна висота моба.
+     * "чи ця (x,z)-колонка взагалі колись потрапляє в буфер на БУДЬ-ЯКІЙ висоті" — але, на
+     * відміну від {@link #isInsideZone}, це НЕ "чесна" лінія партиклів, а вже розширена на
+     * {@link #BUILD_GAP_EXTRA_BLOCKS}: саме цей (ширший) варіант використовують усі рішення
+     * підйому в {@code TowerClimbGoal} (де стартувати, чи "з'їла" зона колонку під час росту, чи
+     * вже вийшли з неї після сайдстепу) — щоб моб завжди лишав видимий проміжок ЗА лінією
+     * партиклів, а не впритул до неї (партикли й пошук виходу за побудовою СУСІДНІ, тож самого
+     * reach для проміжку не досить, потрібне окреме додаткове кільце).
      */
     public boolean isColumnInsideFootprint(int x, int z) {
-        return this.bufferedFootprintXZ.contains(PlatformScanner.key(x, z));
+        return this.buildExclusionXZ.contains(PlatformScanner.key(x, z));
     }
 
     /**
@@ -332,12 +362,13 @@ public final class TowerZoneData {
                              double attackRange, double blockRange, double rawReach, double cappedReach) {
         String msg = String.format(
                 "[DEBUG TowerZone] скан=%d_клітинок 7x7=%s атака/блоки=%.1f/%.1f reach(комб.сирий/кеп)=%.1f/%.1f "
-                        + "площа(накоп)=%d буфер(накоп)=%d roofY=%d гравців_в_зоні=%d",
+                        + "площа(накоп)=%d буфер_партиклів(накоп)=%d буфер_будівництва(накоп)=%d roofY=%d "
+                        + "гравців_в_зоні=%d",
                 result.columns().size(),
                 result.full7x7Center() != null ? result.full7x7Center().toShortString() : "нема",
                 attackRange, blockRange, rawReach, cappedReach,
-                this.platformColumns.size(), this.bufferedFootprintXZ.size(), this.roofY,
-                this.linkedPlayerIds.size());
+                this.platformColumns.size(), this.bufferedFootprintXZ.size(), this.buildExclusionXZ.size(),
+                this.roofY, this.linkedPlayerIds.size());
 
         for (UUID id : this.linkedPlayerIds) {
             Player p = level.getServer().getPlayerList().getPlayer(id);

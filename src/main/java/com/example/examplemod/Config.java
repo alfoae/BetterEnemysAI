@@ -21,6 +21,7 @@ public class Config {
     public static final ModConfigSpec.IntValue TOWER_ZONE_SCAN_RADIUS;
     public static final ModConfigSpec.IntValue TOWER_ZONE_GAP_MERGE_BLOCKS;
     public static final ModConfigSpec.IntValue TOWER_ZONE_REACH_CAP;
+    public static final ModConfigSpec.IntValue TOWER_ZONE_FLAT_PATCH_RADIUS;
 
     // Фаза 4, клатч (див. MobClutchRecovery) - шанс УСПІШНО виконати кожну конкретну спробу.
     public static final ModConfigSpec.DoubleValue CLUTCH_FIRST_ATTEMPT_CHANCE;
@@ -100,6 +101,20 @@ public class Config {
                         "того, що модовий предмет з reach=64 змусить моба будувати структуру на ",
                         "десятки блоків в обхід.")
                 .defineInRange("towerZoneReachCap", 8, 3, 20);
+
+        TOWER_ZONE_FLAT_PATCH_RADIUS = builder
+                .comment("Радіус (у блоках) суцільної рівної площадки, яку моб шукає для короткого ",
+                        "'пробити стелю просто під гравцем і застрибнути' заходу (TowerClimbGoal, ",
+                        "стадії TO_7X7/CROSS_AND_DIG) — сам механізм і код і далі звуться '7x7' ",
+                        "(це радіус 3, оригінальне значення), але ЖИВИЙ ТЕСТ показав: вимога РІВНО ",
+                        "7x7 без жодного розриву на реальних площадках гравця майже ніколи не ",
+                        "виконується (нерівність, огорожа, площадка менша за 7x7) — тому цей ",
+                        "короткий шлях лишався готовим, але без жодного шансу увімкнутись, і моб ",
+                        "завжди йшов довшим шляхом (підйом аж до даху зони, тоді міст зверху). ",
+                        "Радіус 1 = 3x3 — той самий мінімум, що й так реально потрібен самому ",
+                        "CROSS_AND_DIG (хрест-підпору він добудовує сам; менший радіус лише про ",
+                        "впевненість, що звичайна навігація туди дійде).")
+                .defineInRange("towerZoneFlatPatchRadius", 1, 1, 3);
 
         builder.pop();
 
