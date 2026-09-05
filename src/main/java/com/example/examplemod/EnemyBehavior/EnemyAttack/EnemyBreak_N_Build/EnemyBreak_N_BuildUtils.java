@@ -113,6 +113,7 @@ public final class EnemyBreak_N_BuildUtils {
         if (!PursuitEnemyBehavior.isMemoryChasing(mob)) return false;
         return !PursuitEnemyBehavior.isSearchModeActive(mob);
     }
+
     // Затримка між постановками блоків одним і тим самим мобом - "у ванілі у гравця є задержка
     // перед установкою блока" (короткий per-mob кулдаун, ОКРЕМИЙ від ACTION_COOLDOWN_TICKS
     // конкретних Goal-ів: цей рахується на РІВНІ самого API постановки блоку, тож діє
@@ -322,14 +323,6 @@ public final class EnemyBreak_N_BuildUtils {
     }
 
     /**
-     * Та сама умова, що раніше жила приватно всередині {@link BuildPathGoal} — винесена сюди,
-     * щоб {@link TowerClimbGoal} перевіряла "це підйом?" ІДЕНТИЧНО, а не своєю копією порогу.
-     */
-    public static boolean needsClimb(Mob mob, BlockPos target) {
-        return target.getY() - mob.blockPosition().getY() >= CLIMB_HEIGHT_THRESHOLD;
-    }
-
-    /**
      * "не вміти ставити блоки в повітрі... тільки якщо біля нього є інший блок" — усі 6 граней-
      * сусідів (не по діагоналі — так само суворо, як і в гравця: дотику лише кутом не досить).
      */
@@ -340,6 +333,14 @@ public final class EnemyBreak_N_BuildUtils {
                 || level.getBlockState(pos.south()).isSolid()
                 || level.getBlockState(pos.east()).isSolid()
                 || level.getBlockState(pos.west()).isSolid();
+    }
+
+    /**
+     * Та сама умова, що раніше жила приватно всередині {@link BuildPathGoal} — винесена сюди,
+     * щоб {@link TowerClimbGoal} перевіряла "це підйом?" ІДЕНТИЧНО, а не своєю копією порогу.
+     */
+    public static boolean needsClimb(Mob mob, BlockPos target) {
+        return target.getY() - mob.blockPosition().getY() >= CLIMB_HEIGHT_THRESHOLD;
     }
 
     /**

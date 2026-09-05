@@ -13,14 +13,19 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * ФАЗА 1 (фундамент): "площа гравця + радіус атаки" — зона, яку моб має обходити ЗОВНІ під час
- * підйому, а не впиратися впритул. Спільна на ГРАВЦЯ (не на конкретного моба): будь-який моб, що
- * зараз лізе вгору до того самого гравця, читає й доростає ОДНІ Й ТІ САМІ дані.
+ * ФАЗА 1 (фундамент): "площа гравця + reach" — зона, яку моб має обходити ЗОВНІ під час підйому,
+ * а не впиратися впритул. "reach" тут — {@link PlayerReachUtils#getCombinedRawReach}: БІЛЬШИЙ з
+ * радіуса АТАКИ ({@code Attributes.ENTITY_INTERACTION_RANGE}) і радіуса ВЗАЄМОДІЇ З БЛОКАМИ
+ * ({@code Attributes.BLOCK_INTERACTION_RANGE}), +1 — а НЕ сам по собі радіус атаки. Цей reach
+ * додається по БОКАХ і ВВЕРХ (буфер площі й дах зони відповідно); ВНИЗ зона нічим не обмежена —
+ * (x,z)-колонка, що потрапила в буфер, лишається "в зоні" на будь-якій глибині, а не тільки біля
+ * поверхні площі. Спільна на ГРАВЦЯ (не на конкретного моба): будь-який моб, що зараз лізе вгору
+ * до того самого гравця, читає й доростає ОДНІ Й ТІ САМІ дані.
  * <p>
  * <b>Монотонне зростання</b> (навмисно): відсканована площа, буферизована (площа+reach) зона і
  * "дах" зони (roofY) можуть тільки РОСТИ. Якщо гравець тимчасово бере предмет, що збільшує
- * {@code Attributes.ENTITY_INTERACTION_RANGE}, а потім знімає його — зона лишається такою ж
- * великою, ніби предмет і досі надітий.
+ * {@code Attributes.ENTITY_INTERACTION_RANGE} чи {@code Attributes.BLOCK_INTERACTION_RANGE}, а
+ * потім знімає його — зона лишається такою ж великою, ніби предмет і досі надітий.
  * <p>
  * <b>Виняток — {@link #full7x7Center}</b>: НЕ монотонне, завжди СВІЖЕ значення з останнього
  * сканування. Це не про безпеку (як решта зони), а про "чи є зараз зручне місце для короткого
@@ -216,7 +221,9 @@ public final class TowerZoneData {
                 Config.TOWER_ZONE_SCAN_RADIUS.get(),
                 Config.TOWER_ZONE_GAP_MERGE_BLOCKS.get());
 
-        double rawReach = PlayerReachUtils.getRawEntityInteractionRange(player);
+        double attackRange = PlayerReachUtils.getRawEntityInteractionRange(player);
+        double blockRange = PlayerReachUtils.getRawBlockInteractionRange(player);
+        double rawReach = PlayerReachUtils.getCombinedRawReach(player); // = max(attackRange, blockRange) + 1
         double cappedReach = PlayerReachUtils.getReachCappedForZoneSizing(player);
         int reachBlocks = (int) Math.ceil(cappedReach);
 
@@ -238,7 +245,7 @@ public final class TowerZoneData {
             this.roofY = Math.max(this.roofY, scanMaxY + reachBlocks); // МОНОТОННО - лише max
         }
 
-        debugReport(level, result, rawReach, cappedReach);
+        debugReport(level, result, attackRange, blockRange, rawReach, cappedReach);
     }
 
     /**
@@ -321,13 +328,14 @@ public final class TowerZoneData {
     // ТИМЧАСОВИЙ DEBUG: текстовий звіт УСІМ гравцям, чиї зони зараз об'єднані сюди (щоб було видно
     // й саме об'єднання), + часточки по периметру буферної зони. Прибрати разом з рештою
     // debugMsg-викликів після тестування Фази 1.
-    private void debugReport(ServerLevel level, PlatformScanner.Result result, double rawReach, double cappedReach) {
+    private void debugReport(ServerLevel level, PlatformScanner.Result result,
+                             double attackRange, double blockRange, double rawReach, double cappedReach) {
         String msg = String.format(
-                "[DEBUG TowerZone] скан=%d_клітинок 7x7=%s reach(сирий/кеп)=%.1f/%.1f "
+                "[DEBUG TowerZone] скан=%d_клітинок 7x7=%s атака/блоки=%.1f/%.1f reach(комб.сирий/кеп)=%.1f/%.1f "
                         + "площа(накоп)=%d буфер(накоп)=%d roofY=%d гравців_в_зоні=%d",
                 result.columns().size(),
                 result.full7x7Center() != null ? result.full7x7Center().toShortString() : "нема",
-                rawReach, cappedReach,
+                attackRange, blockRange, rawReach, cappedReach,
                 this.platformColumns.size(), this.bufferedFootprintXZ.size(), this.roofY,
                 this.linkedPlayerIds.size());
 
