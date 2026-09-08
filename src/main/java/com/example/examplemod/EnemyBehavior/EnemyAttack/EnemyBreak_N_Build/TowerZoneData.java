@@ -79,6 +79,14 @@ public final class TowerZoneData {
      */
     private static final int BUILD_GAP_EXTRA_BLOCKS = 1;
 
+    /**
+     * Наскільки вище за "сира поверхня гравця + reach" піднімаємо {@link #roofY}. Впливає ЛИШЕ на
+     * Y (дах зони) - на відміну від {@link #BUILD_GAP_EXTRA_BLOCKS}, тут навмисно НЕ чіпаємо
+     * {@code reachBlocks}, який іде і в {@link #bufferedFootprintXZ}, і в
+     * {@link #buildExclusionXZ} - інакше цей запас поповз би і в X/Z-буфери теж.
+     */
+    private static final int ROOF_EXTRA_BLOCKS = 1;
+
     private final Map<Long, Integer> platformColumns = new HashMap<>();
     private final Set<Long> bufferedFootprintXZ = new HashSet<>();
     private final Set<Long> buildExclusionXZ = new HashSet<>();
@@ -234,42 +242,17 @@ public final class TowerZoneData {
         }
     }
 
-    private void rescan(ServerLevel level, Player player, long now) {
-        this.lastScanGameTime = now;
-
-        BlockPos standingPos = player.getOnPos().above();
-        PlatformScanner.Result result = PlatformScanner.scan(
-                level, standingPos,
-                Config.TOWER_ZONE_SCAN_RADIUS.get(),
-                Config.TOWER_ZONE_GAP_MERGE_BLOCKS.get());
-
-        double attackRange = PlayerReachUtils.getRawEntityInteractionRange(player);
-        double blockRange = PlayerReachUtils.getRawBlockInteractionRange(player);
-        double rawReach = PlayerReachUtils.getCombinedRawReach(player); // = max(attackRange, blockRange) + 2
-        double cappedReach = PlayerReachUtils.getReachCappedForZoneSizing(player);
-        int reachBlocks = (int) Math.ceil(cappedReach);
-
-        int scanMaxY = Integer.MIN_VALUE;
-        for (Map.Entry<Long, Integer> entry : result.columns().entrySet()) {
-            // МОНОТОННО щодо ЧЛЕНСТВА (ключ ніколи не видаляється), але Y перезаписуємо на
-            // актуальний з цього скану - для посадки важливо знати РЕАЛЬНУ поверхню зараз, а не
-            // історичну (на відміну від самого факту "ця колонка колись була площею", який має
-            // лишатись назавжди заради буфера/безпеки).
-            this.platformColumns.put(entry.getKey(), entry.getValue());
-            scanMaxY = Math.max(scanMaxY, entry.getValue());
+    /**
+     * Той самий однокроковий "більша вісь наперед" рух, що й {@code EnemyBreak_N_BuildUtils.nextHorizontalStep}.
+     */
+    private static BlockPos straightHorizontalStep(BlockPos from, BlockPos to, int travelY) {
+        int dx = to.getX() - from.getX();
+        int dz = to.getZ() - from.getZ();
+        if (dx == 0 && dz == 0) return new BlockPos(to.getX(), travelY, to.getZ());
+        if (Math.abs(dx) >= Math.abs(dz)) {
+            return new BlockPos(from.getX() + Integer.signum(dx), travelY, from.getZ());
         }
-
-        this.full7x7Center = result.full7x7Center(); // "живе" значення цього скану, див. джавадок класу
-
-        this.bufferedFootprintXZ.addAll(bufferBoundary(this.platformColumns.keySet(), reachBlocks, cappedReach));
-        this.buildExclusionXZ.addAll(bufferBoundary(this.platformColumns.keySet(),
-                reachBlocks + BUILD_GAP_EXTRA_BLOCKS, cappedReach + BUILD_GAP_EXTRA_BLOCKS));
-
-        if (scanMaxY != Integer.MIN_VALUE) {
-            this.roofY = Math.max(this.roofY, scanMaxY + reachBlocks); // МОНОТОННО - лише max
-        }
-
-        debugReport(level, result, attackRange, blockRange, rawReach, cappedReach);
+        return new BlockPos(from.getX(), travelY, from.getZ() + Integer.signum(dz));
     }
 
     /**
@@ -340,11 +323,150 @@ public final class TowerZoneData {
         return best;
     }
 
+    private void rescan(ServerLevel level, Player player, long now) {
+        this.lastScanGameTime = now;
+
+        BlockPos standingPos = player.getOnPos().above();
+        PlatformScanner.Result result = PlatformScanner.scan(
+                level, standingPos,
+                Config.TOWER_ZONE_SCAN_RADIUS.get(),
+                Config.TOWER_ZONE_GAP_MERGE_BLOCKS.get());
+
+        double attackRange = PlayerReachUtils.getRawEntityInteractionRange(player);
+        double blockRange = PlayerReachUtils.getRawBlockInteractionRange(player);
+        double rawReach = PlayerReachUtils.getCombinedRawReach(player); // = max(attackRange, blockRange) + 2
+        double cappedReach = PlayerReachUtils.getReachCappedForZoneSizing(player);
+        int reachBlocks = (int) Math.ceil(cappedReach);
+
+        int scanMaxY = Integer.MIN_VALUE;
+        for (Map.Entry<Long, Integer> entry : result.columns().entrySet()) {
+            // МОНОТОННО щодо ЧЛЕНСТВА (ключ ніколи не видаляється), але Y перезаписуємо на
+            // актуальний з цього скану - для посадки важливо знати РЕАЛЬНУ поверхню зараз, а не
+            // історичну (на відміну від самого факту "ця колонка колись була площею", який має
+            // лишатись назавжди заради буфера/безпеки).
+            this.platformColumns.put(entry.getKey(), entry.getValue());
+            scanMaxY = Math.max(scanMaxY, entry.getValue());
+        }
+
+        this.full7x7Center = result.full7x7Center(); // "живе" значення цього скану, див. джавадок класу
+
+        this.bufferedFootprintXZ.addAll(bufferBoundary(this.platformColumns.keySet(), reachBlocks, cappedReach));
+        this.buildExclusionXZ.addAll(bufferBoundary(this.platformColumns.keySet(),
+                reachBlocks + BUILD_GAP_EXTRA_BLOCKS, cappedReach + BUILD_GAP_EXTRA_BLOCKS));
+
+        if (scanMaxY != Integer.MIN_VALUE) {
+            this.roofY = Math.max(this.roofY, scanMaxY + reachBlocks + ROOF_EXTRA_BLOCKS); // МОНОТОННО - лише max
+        }
+
+        debugReport(level, result, attackRange, blockRange, rawReach, cappedReach);
+    }
+
     private boolean allNeighborsKnown(int x, int z) {
         return this.platformColumns.containsKey(PlatformScanner.key(x + 1, z))
                 && this.platformColumns.containsKey(PlatformScanner.key(x - 1, z))
                 && this.platformColumns.containsKey(PlatformScanner.key(x, z + 1))
                 && this.platformColumns.containsKey(PlatformScanner.key(x, z - 1));
+    }
+
+    /**
+     * "будує міст строго над партиклами зони, а не рівно під ними" — один крок горизонтального
+     * руху мосту ВІД fromXZ ДО toXZ, обмежений так, щоб (коли можливо) лишатись над клітинками
+     * {@link #bufferedFootprintXZ} — тими самими, що позначені партиклями в
+     * {@link #spawnBoundaryParticles} — а не різати найкоротшою прямою повз зону, над нічим не
+     * позначеною територією.
+     * <p>
+     * Поки міст ще НЕ зайшов у зону (моб щойно з опорного стовпа, який за побудовою лежить ЗА
+     * {@link #buildExclusionXZ}, тобто поза й {@link #bufferedFootprintXZ} теж) — веде
+     * найкоротшим шляхом ДО найближчої клітинки зони: сам розрив між стовпом і межею зони нічим
+     * не позначений, там і так нема на що дивитись. Щойно fromXZ усередині — веде СУВОРО по
+     * клітинках зони (BFS по 4-сусідах) аж до toXZ (або до найближчої зонної клітинки до toXZ,
+     * якщо сама ціль з якоїсь причини поза зоною — наприклад {@code findAnyLandingTile} віддав
+     * щось за межами {@link #platformColumns}, чого штатно не мало б статись).
+     */
+    public BlockPos nextBridgeStep(BlockPos fromXZ, BlockPos toXZ, int travelY) {
+        long fromKey = PlatformScanner.key(fromXZ.getX(), fromXZ.getZ());
+        long toKey = PlatformScanner.key(toXZ.getX(), toXZ.getZ());
+        if (fromKey == toKey) {
+            return new BlockPos(toXZ.getX(), travelY, toXZ.getZ());
+        }
+
+        if (!this.bufferedFootprintXZ.contains(fromKey)) {
+            Long nearest = nearestZoneCellKey(fromXZ.getX(), fromXZ.getZ());
+            BlockPos towards = nearest != null
+                    ? new BlockPos(PlatformScanner.unpackX(nearest), travelY, PlatformScanner.unpackZ(nearest))
+                    : toXZ; // зона порожня (не мало б статись за живого buildExclusionXZ-старту) - фолбек на пряму до цілі
+            return straightHorizontalStep(fromXZ, towards, travelY);
+        }
+
+        long targetKey = toKey;
+        if (!this.bufferedFootprintXZ.contains(targetKey)) {
+            Long nearest = nearestZoneCellKey(toXZ.getX(), toXZ.getZ());
+            if (nearest == null)
+                return straightHorizontalStep(fromXZ, toXZ, travelY); // зона порожня - не мало б статись
+            targetKey = nearest;
+        }
+
+        Long stepKey = bfsFirstStepWithinZone(fromKey, targetKey);
+        if (stepKey == null) {
+            // недосяжно СУВОРО по зоні (розірвана на непов'язані острівці) - пряма лінія, як і
+            // раніше, краще за повну зупинку.
+            return straightHorizontalStep(fromXZ, toXZ, travelY);
+        }
+        return new BlockPos(PlatformScanner.unpackX(stepKey), travelY, PlatformScanner.unpackZ(stepKey));
+    }
+
+    private Long nearestZoneCellKey(int x, int z) {
+        Long best = null;
+        long bestDistSq = Long.MAX_VALUE;
+        for (long key : this.bufferedFootprintXZ) {
+            long dx = PlatformScanner.unpackX(key) - x;
+            long dz = PlatformScanner.unpackZ(key) - z;
+            long distSq = dx * dx + dz * dz;
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                best = key;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * BFS по 4-сусідах СУВОРО в межах {@link #bufferedFootprintXZ}, від fromKey до targetKey.
+     * Повертає ключ ПЕРШОГО кроку на знайденому найкоротшому шляху, або null, якщо шляху нема
+     * (зона розірвана на непов'язані острівці — теоретично можливо після часткового руйнування).
+     * Дешево: зона за живих тестів — одиниці/десятки клітинок, не тисячі.
+     */
+    private Long bfsFirstStepWithinZone(long fromKey, long targetKey) {
+        if (fromKey == targetKey) return null;
+
+        Map<Long, Long> cameFrom = new HashMap<>();
+        ArrayDeque<Long> queue = new ArrayDeque<>();
+        queue.add(fromKey);
+        cameFrom.put(fromKey, fromKey);
+
+        while (!queue.isEmpty()) {
+            long current = queue.poll();
+            if (current == targetKey) break;
+            int cx = PlatformScanner.unpackX(current);
+            int cz = PlatformScanner.unpackZ(current);
+            long[] neighbors = {
+                    PlatformScanner.key(cx + 1, cz), PlatformScanner.key(cx - 1, cz),
+                    PlatformScanner.key(cx, cz + 1), PlatformScanner.key(cx, cz - 1)
+            };
+            for (long next : neighbors) {
+                if (!this.bufferedFootprintXZ.contains(next) || cameFrom.containsKey(next)) continue;
+                cameFrom.put(next, current);
+                queue.add(next);
+            }
+        }
+
+        if (!cameFrom.containsKey(targetKey)) return null;
+
+        long step = targetKey;
+        while (cameFrom.get(step) != fromKey) {
+            step = cameFrom.get(step);
+        }
+        return step;
     }
 
     public BlockPos getFull7x7Center() {
