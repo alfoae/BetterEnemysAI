@@ -39,10 +39,22 @@ public final class EnemyBreak_N_BuildUtils {
     // 3=атака) означають, що щойно шлях "заблоковано" - build/dig миттєво перехоплюють
     // керування, не давши pursuit жодного шансу. Тому "заблоковано" тепер повертається
     // НАЗОВНІ, лише якщо це триває безперервно вже PURSUIT_GRACE_PERIOD_TICKS - весь цей час
-    // pursuit (пріоритет 3) може просто дійти й вдарити сам, як і мало бути. Два окремих
-    // трекери (не один спільний) - щоб перевірка height-тригера і nav-тригера не скидали
-    // таймер одна одній, коли обидва Goal питають в один і той самий тік.
-    private static final Map<Mob, Integer> HEIGHT_BLOCKED_SINCE_TICK = new WeakHashMap<>();
+    // pursuit (пріоритет 3) може просто дійти й вдарити сам, як і мало бути.
+    // <p>
+    // ФІКС (живий тест: моб зістрибував з недобудованого стовпа рівно тоді, коли Y майже
+    // зрівнювався з гравцем): раніше тут було ДВА трекери за ТИПОМ причини (висота/навігація), і
+    // {@link #isPathBlocked} перемикався між ними за порогом heightDifference<2.0 - у момент
+    // перемикання height-трекер (уже давно пройшов grace) просто переставав опитуватись, а
+    // nav-трекер стартував із НУЛЯ і сам по собі потребував нових 30 тіків, перш ніж знову
+    // повернути true. Ці ~30 тіків isPathBlocked() хибно повертав false, хоча реального шляху
+    // так само не було (canReach лишався false) - і саме в цьому вікні PursuitEnemyMeleeBehavior
+    // встигав перехопити керування й повести моба по частковому шляху вниз/убік. Тепер ОДИН
+    // трекер на СИРИЙ комбінований сигнал (висота АБО навігація) - перехід через поріг більше не
+    // скидає накопичений час.
+    private static final Map<Mob, Integer> PATH_BLOCKED_SINCE_TICK = new WeakHashMap<>();
+    // Окремий трекер лишається лише для {@link #isNavigationBlocked} самого по собі - його
+    // незалежно й напряму викликає {@link DigThroughWallsGoal} (без надбавки за висоту), тож його
+    // власний grace-таймер має рахуватись сам по собі, не змішуючись із isPathBlocked.
     private static final Map<Mob, Integer> NAV_BLOCKED_SINCE_TICK = new WeakHashMap<>();
     private static final int PURSUIT_GRACE_PERIOD_TICKS = 30; // 1.5с - скільки часу дається pursuit перш ніж підключати будівництво/копання
     private static final Map<Mob, NavCache> NAV_CACHE = new WeakHashMap<>();
@@ -77,6 +89,20 @@ public final class EnemyBreak_N_BuildUtils {
         int sinceTick = tracker.computeIfAbsent(mob, m -> mob.tickCount);
         return (mob.tickCount - sinceTick) >= PURSUIT_GRACE_PERIOD_TICKS;
     }
+    // Затримка між постановками блоків одним і тим самим мобом - "у ванілі у гравця є задержка
+    // перед установкою блока" (короткий per-mob кулдаун, ОКРЕМИЙ від ACTION_COOLDOWN_TICKS
+    // конкретних Goal-ів: цей рахується на РІВНІ самого API постановки блоку, тож діє
+    // однаково для геть усіх викликів, включно з "аварійними" - ensureFloorUnderneathWhileAirborne
+    // у TowerClimbGoal навмисно не чекає на власний кулдаун Goal-у, бо вікно падіння коротке).
+    private static final Map<Mob, Long> LAST_PLACE_TICK = new WeakHashMap<>();
+
+    public static boolean canOperate(Mob mob) {
+        if (!Config.ENABLE_MOB_TERRAFORMING.get()) return false;
+        if (!(mob.level() instanceof ServerLevel level)) return false;
+        if (!level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) return false;
+        if (!PursuitEnemyBehavior.isMemoryChasing(mob)) return false;
+        return !PursuitEnemyBehavior.isSearchModeActive(mob);
+    }
 
     /**
      * "Заблоковано" з надбавкою за різницю висот: ціль на 2+ блоки вище вважається заблокованою,
@@ -90,36 +116,29 @@ public final class EnemyBreak_N_BuildUtils {
         double heightDifference = chasePos.y - mob.getY();
         boolean rawHeightBlocked = heightDifference >= 2.0;
 
-        if (rawHeightBlocked) {
-            boolean pastGrace = pastGracePeriod(HEIGHT_BLOCKED_SINCE_TICK, mob, true);
-            // ТИМЧАСОВИЙ DEBUG: раз/сек - показує саме ЦЮ причину (висота) і статус grace-періоду.
-            if (mob.tickCount % 20 == 0) {
-                Integer since = HEIGHT_BLOCKED_SINCE_TICK.get(mob);
-                int duration = since != null ? mob.tickCount - since : 0;
-                debugMsg(mob, String.format(
-                        "[DEBUG isPathBlocked] висота=%.2f (поріг 2.0) заблоковано_тіків=%d/%d минув_grace=%s",
-                        heightDifference, duration, PURSUIT_GRACE_PERIOD_TICKS, pastGrace));
-            }
-            return pastGrace;
+        // Той самий кеш на тік, що й isNavigationBlocked/PursuitEnemyMeleeBehavior.tick()
+        // використовують через getOrComputePath - рахуємо це тут БЕЗУМОВНО (а не лише коли
+        // rawHeightBlocked=false, як було раніше), щоб сирий сигнал був БЕЗПЕРЕРВНИМ по обидва
+        // боки порогу heightDifference=2.0. Зайвого createPath() це не додає: поки моб ще
+        // далеко/явно нижче, шлях і так майже завжди недосяжний (rawNavBlocked теж true), а сам
+        // виклик кешується на тік спільно з усіма іншими викликачами.
+        Path navPath = getOrComputePath(mob, chasePos);
+        boolean rawNavBlocked = navPath == null || !navPath.canReach();
+        boolean rawBlockedNow = rawHeightBlocked || rawNavBlocked;
+
+        boolean pastGrace = pastGracePeriod(PATH_BLOCKED_SINCE_TICK, mob, rawBlockedNow);
+        // ТИМЧАСОВИЙ DEBUG: раз/сек - показує ОБИДВІ сирі причини і спільний статус grace-періоду.
+        if (mob.tickCount % 20 == 0) {
+            Integer since = PATH_BLOCKED_SINCE_TICK.get(mob);
+            int duration = since != null ? mob.tickCount - since : 0;
+            debugMsg(mob, String.format(
+                    "[DEBUG isPathBlocked] висота=%.2f (поріг 2.0, сире=%s) навігація(сире)=%s "
+                            + "заблоковано_тіків=%d/%d минув_grace=%s",
+                    heightDifference, rawHeightBlocked, rawNavBlocked,
+                    duration, PURSUIT_GRACE_PERIOD_TICKS, pastGrace));
         }
-
-        return isNavigationBlocked(mob, chasePos);
+        return pastGrace;
     }
-
-    public static boolean canOperate(Mob mob) {
-        if (!Config.ENABLE_MOB_TERRAFORMING.get()) return false;
-        if (!(mob.level() instanceof ServerLevel level)) return false;
-        if (!level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) return false;
-        if (!PursuitEnemyBehavior.isMemoryChasing(mob)) return false;
-        return !PursuitEnemyBehavior.isSearchModeActive(mob);
-    }
-
-    // Затримка між постановками блоків одним і тим самим мобом - "у ванілі у гравця є задержка
-    // перед установкою блока" (короткий per-mob кулдаун, ОКРЕМИЙ від ACTION_COOLDOWN_TICKS
-    // конкретних Goal-ів: цей рахується на РІВНІ самого API постановки блоку, тож діє
-    // однаково для геть усіх викликів, включно з "аварійними" - ensureFloorUnderneathWhileAirborne
-    // у TowerClimbGoal навмисно не чекає на власний кулдаун Goal-у, бо вікно падіння коротке).
-    private static final Map<Mob, Long> LAST_PLACE_TICK = new WeakHashMap<>();
 
     /**
      * СПІЛЬНИЙ кеш шляху на тік — рахує {@code createPath()} НЕ БІЛЬШЕ РАЗУ на тік на моба,
@@ -296,46 +315,6 @@ public final class EnemyBreak_N_BuildUtils {
     }
 
     /**
-     * Та сама умова, що раніше жила приватно всередині {@link BuildPathGoal} — винесена сюди,
-     * щоб {@link TowerClimbGoal} перевіряла "це підйом?" ІДЕНТИЧНО, а не своєю копією порогу.
-     */
-    public static boolean needsClimb(Mob mob, BlockPos target) {
-        return target.getY() - mob.blockPosition().getY() >= CLIMB_HEIGHT_THRESHOLD;
-    }
-
-    public static boolean isBreakable(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        if (state.isAir() || !state.isSolid()) return false;
-        if (state.getDestroySpeed(level, pos) < 0) return false;
-        return !state.hasBlockEntity();
-    }
-
-    public static void breakBlock(Level level, BlockPos pos, Mob mob) {
-        BlockState state = level.getBlockState(pos);
-
-        ItemStack drop = new ItemStack(state.getBlock().asItem());
-        if (!drop.isEmpty() && mob instanceof IMobBlockStorage storage) {
-            storage.addDugBlock(drop);
-        }
-
-        level.playSound(null, pos, state.getSoundType().getBreakSound(), SoundSource.HOSTILE, 1.0F, 1.0F);
-        level.destroyBlock(pos, false);
-    }
-
-    /**
-     * "не вміти ставити блоки в повітрі... тільки якщо біля нього є інший блок" — усі 6 граней-
-     * сусідів (не по діагоналі — так само суворо, як і в гравця: дотику лише кутом не досить).
-     */
-    public static boolean hasAdjacentSolid(Level level, BlockPos pos) {
-        return level.getBlockState(pos.below()).isSolid()
-                || level.getBlockState(pos.above()).isSolid()
-                || level.getBlockState(pos.north()).isSolid()
-                || level.getBlockState(pos.south()).isSolid()
-                || level.getBlockState(pos.east()).isSolid()
-                || level.getBlockState(pos.west()).isSolid();
-    }
-
-    /**
      * ВИПРАВЛЕНО (живий тест: моб "зависав" у BRIDGE_TO_PLAYER): рахувати напрям як ПОВНИЙ 3D
      * вектор (до цілі, включно з Y), нормалізувати його, і лише ТОДІ округлювати x/z — небезпечно,
      * коли ціль набагато нижче/вище моба. Велика різниця по Y "забирає" собі більшу частину
@@ -374,6 +353,46 @@ public final class EnemyBreak_N_BuildUtils {
             return mobPos.offset(Integer.signum(dx), 0, 0);
         }
         return mobPos.offset(0, 0, Integer.signum(dz));
+    }
+
+    /**
+     * Та сама умова, що раніше жила приватно всередині {@link BuildPathGoal} — винесена сюди,
+     * щоб {@link TowerClimbGoal} перевіряла "це підйом?" ІДЕНТИЧНО, а не своєю копією порогу.
+     */
+    public static boolean needsClimb(Mob mob, BlockPos target) {
+        return target.getY() - mob.blockPosition().getY() >= CLIMB_HEIGHT_THRESHOLD;
+    }
+
+    public static boolean isBreakable(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.isAir() || !state.isSolid()) return false;
+        if (state.getDestroySpeed(level, pos) < 0) return false;
+        return !state.hasBlockEntity();
+    }
+
+    public static void breakBlock(Level level, BlockPos pos, Mob mob) {
+        BlockState state = level.getBlockState(pos);
+
+        ItemStack drop = new ItemStack(state.getBlock().asItem());
+        if (!drop.isEmpty() && mob instanceof IMobBlockStorage storage) {
+            storage.addDugBlock(drop);
+        }
+
+        level.playSound(null, pos, state.getSoundType().getBreakSound(), SoundSource.HOSTILE, 1.0F, 1.0F);
+        level.destroyBlock(pos, false);
+    }
+
+    /**
+     * "не вміти ставити блоки в повітрі... тільки якщо біля нього є інший блок" — усі 6 граней-
+     * сусідів (не по діагоналі — так само суворо, як і в гравця: дотику лише кутом не досить).
+     */
+    public static boolean hasAdjacentSolid(Level level, BlockPos pos) {
+        return level.getBlockState(pos.below()).isSolid()
+                || level.getBlockState(pos.above()).isSolid()
+                || level.getBlockState(pos.north()).isSolid()
+                || level.getBlockState(pos.south()).isSolid()
+                || level.getBlockState(pos.east()).isSolid()
+                || level.getBlockState(pos.west()).isSolid();
     }
 
     /**

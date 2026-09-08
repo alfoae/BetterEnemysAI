@@ -560,11 +560,27 @@ public class TowerClimbGoal extends Goal {
         double horizontalDistSq = dx * dx + dz * dz;
 
         if (horizontalDistSq <= FALL_ZONE_DIST_SQ) {
-            // "просто падає на цей блок/гравця" - вже прямо над ціллю: цілимось точно в РЕАЛЬНУ
-            // висоту гравця (тут це навмисно - гравітація сама доробить решту, підстрахування
-            // від зносу вбік), і БІЛЬШЕ не підкладаємо опору.
-            this.mob.getNavigation().moveTo(
-                    landingTarget.getX() + 0.5, landingTarget.getY(), landingTarget.getZ() + 0.5, 1.0D);
+            // ВИПРАВЛЕНО (живий тест: моб "ступорився" рівно тут замість стрибка): це був той
+            // самий "vanilla-навігація мовчки відмовляється будувати шлях" баг, що описаний нижче
+            // для travelY - тільки пропущений саме в тому місці, де моб і мав нарешті стрибнути.
+            // moveTo() до РЕАЛЬНОЇ висоти гравця (може лежати на 5-10+ непідпертих блоків нижче
+            // моба, що стоїть на даху зони) не будує шлях узагалі: ціль технічно поставлена, але
+            // навігатор просто нічого не робить, і моб намертво зависає на краю вже готового
+            // мосту - у логах видно як координати моба, що не змінюються сотні тіків підряд.
+            // Замість навігації - прямий горизонтальний поштовх у бік цілі (як стрибок/пoунс):
+            // гравітація сама довершить падіння, щойно моб зійде з опори (яку свідомо більше не
+            // підкладаємо - див. відсутність ensureFloorUnderneathWhileAirborne нижче по цій гілці).
+            this.mob.getNavigation().stop();
+            double pushX = (landingTarget.getX() + 0.5) - this.mob.getX();
+            double pushZ = (landingTarget.getZ() + 0.5) - this.mob.getZ();
+            double horizLen = Math.sqrt(pushX * pushX + pushZ * pushZ);
+            if (horizLen > 1.0E-4) {
+                double speed = Math.max(this.mob.getSpeed(), 0.2F) * 1.8D;
+                Vec3 currentMotion = this.mob.getDeltaMovement();
+                this.mob.setDeltaMovement(
+                        (pushX / horizLen) * speed, currentMotion.y, (pushZ / horizLen) * speed);
+                this.mob.hasImpulse = true;
+            }
             return;
         }
 
