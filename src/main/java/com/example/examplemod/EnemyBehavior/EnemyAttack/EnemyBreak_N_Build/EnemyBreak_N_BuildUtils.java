@@ -295,12 +295,12 @@ public final class EnemyBreak_N_BuildUtils {
                 && level.getBlockState(pos.below()).isSolid();
     }
 
-    public static BlockPos nextHorizontalStep(Mob mob, BlockPos target) {
-        BlockPos mobPos = mob.blockPosition();
-        Vec3 dir = Vec3.atCenterOf(target).subtract(Vec3.atCenterOf(mobPos));
-        if (dir.lengthSqr() < 0.01) return mobPos;
-        dir = dir.normalize();
-        return mobPos.offset((int) Math.round(dir.x), 0, (int) Math.round(dir.z));
+    /**
+     * Та сама умова, що раніше жила приватно всередині {@link BuildPathGoal} — винесена сюди,
+     * щоб {@link TowerClimbGoal} перевіряла "це підйом?" ІДЕНТИЧНО, а не своєю копією порогу.
+     */
+    public static boolean needsClimb(Mob mob, BlockPos target) {
+        return target.getY() - mob.blockPosition().getY() >= CLIMB_HEIGHT_THRESHOLD;
     }
 
     public static boolean isBreakable(Level level, BlockPos pos) {
@@ -336,11 +336,44 @@ public final class EnemyBreak_N_BuildUtils {
     }
 
     /**
-     * Та сама умова, що раніше жила приватно всередині {@link BuildPathGoal} — винесена сюди,
-     * щоб {@link TowerClimbGoal} перевіряла "це підйом?" ІДЕНТИЧНО, а не своєю копією порогу.
+     * ВИПРАВЛЕНО (живий тест: моб "зависав" у BRIDGE_TO_PLAYER): рахувати напрям як ПОВНИЙ 3D
+     * вектор (до цілі, включно з Y), нормалізувати його, і лише ТОДІ округлювати x/z — небезпечно,
+     * коли ціль набагато нижче/вище моба. Велика різниця по Y "забирає" собі більшу частину
+     * довжини одиничного вектора, тож x- і z-складові падають нижче 0.5 і округлюються до 0 —
+     * тобто крок "нікуди" (mobPos сам на себе), хоча по горизонталі до цілі ще далеко. Саме це
+     * траплялось у {@code TowerClimbGoal.tickBridgeToPlayer} на "близькій" дистанції, де ціллю
+     * стає РЕАЛЬНА висота гравця (могла бути на 5-10+ блоків нижче/вище моба, що стоїть на
+     * власному стовпі) — далі мостом просто нікуди не йшло.
+     * <p>
+     * Це "ГОРИЗОНТАЛЬНИЙ крок" за назвою і задумом — тому Y цілі тут взагалі не бере участі:
+     * рахуємо й нормалізуємо лише (dx, dz).
+     * <p>
+     * ВИПРАВЛЕНО (живий тест #2: моб "застряг", коли ціль було по діагоналі): НІКОЛИ не рухаємось
+     * одночасно по X і Z за один крок. {@link #hasAdjacentSolid} — умова, що дозволяє
+     * {@link #placeBlock} взагалі щось ставити — перевіряє лише 4 КАРДИНАЛЬНІ сторони (північ/
+     * південь/схід/захід) плюс верх/низ, БЕЗ діагоналей. Діагональний крок (dx=±1 і dz=±1
+     * одночасно) торкається попереднього (вже готового) блока лише КУТОМ, а не стороною — жодна з
+     * 4 кардинальних перевірок його не бачить, {@code hasAdjacentSolid} завжди false, блок ніколи
+     * не ставиться, і моб намертво зависає на одній і тій самій "неможливій" діагональній клітинці.
+     * <p>
+     * Замість цього — рухаємось ЛИШЕ по ОДНІЙ осі за раз, тій, де залишок БІЛЬШИЙ (при рівності —
+     * завжди X, це не випадково: саме таке сталий tie-break і дає чергування X,Z,X,Z,... на
+     * рівно діагональній цілі). Кожен наступний блок тоді впритул СТОРОНОЮ до попереднього — точно
+     * так само, як звичайні гравці мостять по діагоналі зигзагом (крок убік, крок уперед, крок
+     * убік, крок уперед), і як це робиться в Bedrock. На не рівно діагональній цілі виходить
+     * природний "сходовий" шлях: більшість кроків уздовж довшої осі, час від часу — крок уздовж
+     * коротшої, поки різниця не вирівняється.
      */
-    public static boolean needsClimb(Mob mob, BlockPos target) {
-        return target.getY() - mob.blockPosition().getY() >= CLIMB_HEIGHT_THRESHOLD;
+    public static BlockPos nextHorizontalStep(Mob mob, BlockPos target) {
+        BlockPos mobPos = mob.blockPosition();
+        int dx = target.getX() - mobPos.getX();
+        int dz = target.getZ() - mobPos.getZ();
+        if (dx == 0 && dz == 0) return mobPos;
+
+        if (Math.abs(dx) >= Math.abs(dz)) {
+            return mobPos.offset(Integer.signum(dx), 0, 0);
+        }
+        return mobPos.offset(0, 0, Integer.signum(dz));
     }
 
     /**

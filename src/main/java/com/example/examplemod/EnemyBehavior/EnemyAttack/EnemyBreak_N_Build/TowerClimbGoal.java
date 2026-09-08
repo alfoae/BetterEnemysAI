@@ -65,8 +65,7 @@ public class TowerClimbGoal extends Goal {
     private static final Direction[] CARDINALS =
             {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
     private static final int TO_7X7_STUCK_TIMEOUT_TICKS = 100; // 5с без прогресу - здаємось, лізем звичайним шляхом
-    private static final double CLOSE_RANGE_DIST_SQ = 144.0; // "12 блоків" з опису користувача
-    private static final double FALL_ZONE_DIST_SQ = 4.0; // ~2 блоки - тут вже просто падає, не будує
+    private static final double FALL_ZONE_DIST_SQ = 1.0; // ~2 блоки - тут вже просто падає, не будує
     private final Mob mob;
     private Stage stage = Stage.DECIDE;
     private BlockPos pillarColumn;   // закомітчена (x,z) колонка підйому (Y не використовується)
@@ -560,21 +559,32 @@ public class TowerClimbGoal extends Goal {
         double dz = landingTarget.getZ() - mobPos.getZ();
         double horizontalDistSq = dx * dx + dz * dz;
 
-        this.mob.getNavigation().moveTo(landingTarget.getX() + 0.5, landingTarget.getY(), landingTarget.getZ() + 0.5, 1.0D);
-
         if (horizontalDistSq <= FALL_ZONE_DIST_SQ) {
-            // "просто падає на цей блок/гравця" - вже прямо над ціллю, опору більше НЕ підкладаємо.
+            // "просто падає на цей блок/гравця" - вже прямо над ціллю: цілимось точно в РЕАЛЬНУ
+            // висоту гравця (тут це навмисно - гравітація сама доробить решту, підстрахування
+            // від зносу вбік), і БІЛЬШЕ не підкладаємо опору.
+            this.mob.getNavigation().moveTo(
+                    landingTarget.getX() + 0.5, landingTarget.getY(), landingTarget.getZ() + 0.5, 1.0D);
             return;
         }
 
         ensureFloorUnderneathWhileAirborne(level);
 
-        // >12 блоків і ще не близько по горизонталі - летимо мостом на висоті даху зони (безпечно
-        // над будь-якою частиною площі, бо зона не сягає вище roofY), а не одразу вниз до гравця;
-        // ≤12 - одразу цілимось на реальну висоту цілі (короткий відрізок, обходити нема сенсу).
-        boolean closeRange = horizontalDistSq <= CLOSE_RANGE_DIST_SQ;
-        int travelY = closeRange ? landingTarget.getY() : Math.max(mobPos.getY(), zone.getRoofY());
+        // ВИПРАВЛЕНО (живий тест, стабільно відтворюється): поки МИ САМІ ще не в "зоні падіння"
+        // (перевірка вище) - завжди цілимось на БЕЗПЕЧНУ (свою поточну / дах зони) висоту, а НЕ
+        // на реальну висоту гравця, скільки б по горизонталі не лишалось. Раніше тут була межа
+        // "≤12 блоків - одразу цілимось на реальну висоту" - і саме вона ламала все: до реальної
+        // висоти гравця (може бути на 5-10+ блоків нижче, якщо гравець на стовпі) просто НЕМАЄ
+        // прохідного шляху - там ще порожньо, під це не підкладено жодного блока, і vanilla-
+        // навігація мовчки відмовляється туди йти. Крок мосту (nextHorizontalStep, вже
+        // виправлений) міг рахувати правильний напрямок - але якщо navigation.moveTo() взагалі не
+        // веде моба нікуди (бо шляху до цілі не існує), напрямок кроку не має значення: моб просто
+        // стоїть на місці. Тепер і навігація, і крок мосту весь час цілять в ОДНУ безпечну точку,
+        // яка завжди досяжна звичайною ходьбою (бо міст під неї щойно добудований).
+        int travelY = Math.max(mobPos.getY(), zone.getRoofY());
         BlockPos travelTarget = new BlockPos(landingTarget.getX(), travelY, landingTarget.getZ());
+
+        this.mob.getNavigation().moveTo(travelTarget.getX() + 0.5, travelTarget.getY(), travelTarget.getZ() + 0.5, 1.0D);
 
         if (--this.actionCooldown > 0) return;
         this.actionCooldown = ACTION_COOLDOWN_TICKS;

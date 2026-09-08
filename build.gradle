@@ -59,6 +59,8 @@ runs {
         workingDirectory project.layout.projectDirectory.dir('run').dir(name)
 
         modSource project.sourceSets.main
+
+        systemProperty 'file.encoding', 'UTF-8'
     }
 
     client {
