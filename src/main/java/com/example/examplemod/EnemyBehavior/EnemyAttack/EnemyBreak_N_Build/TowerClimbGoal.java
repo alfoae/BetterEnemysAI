@@ -144,8 +144,9 @@ public class TowerClimbGoal extends Goal {
         if (zone == null) return; // теоретично неможливо тут (player != null вище), про всяк випадок
 
         if (this.mob.tickCount % 20 == 0) {
+            BlockPos herePos = this.mob.blockPosition();
             EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG TowerClimbGoal] tick stage=" + this.stage
-                    + " моб=" + this.mob.blockPosition() + " roofY=" + zone.getRoofY());
+                    + " моб=" + herePos + " roofY(тут)=" + zone.getLocalRoofY(herePos.getX(), herePos.getZ()));
         }
 
         if (this.stage == Stage.DECIDE) {
@@ -386,8 +387,12 @@ public class TowerClimbGoal extends Goal {
             // інакше (фолбек - нема куди виходити) - просто ігноруємо цей ріст і йдемо далі нижче
         }
 
-        boolean roofKnown = zone.getRoofY() != Integer.MIN_VALUE; // захист від того самого сентинел-багу
-        boolean aboveRoof = roofKnown && this.mob.blockPosition().getY() >= zone.getRoofY();
+        // ФІКС ("дах до неба по сходах"): дах тепер локальний для КОЛОНКИ, з якої моб реально
+        // піляриться (pillarColumn), а не одне глобальне число на всю накопичену зону - див.
+        // TowerZoneData#getLocalRoofY.
+        int localRoof = zone.getLocalRoofY(this.pillarColumn.getX(), this.pillarColumn.getZ());
+        boolean roofKnown = localRoof != Integer.MIN_VALUE; // захист від того самого сентинел-багу
+        boolean aboveRoof = roofKnown && this.mob.blockPosition().getY() >= localRoof;
         // "якщо моб на границі висоти то він просто йде прямо до ближайшої площі без того щоб
         // простроїтися више" - лишаємо запас в WALL_HEIGHT+1, бо на цьому ж кроці ще треба буде
         // місце під стіну поверх підлоги.
@@ -396,7 +401,7 @@ public class TowerClimbGoal extends Goal {
             this.stage = Stage.BRIDGE_TO_PLAYER;
             EnemyBreak_N_BuildUtils.debugMsg(this.mob, "[DEBUG TowerClimbGoal] CLIMBING -> BRIDGE_TO_PLAYER "
                     + (atWorldHeightLimit ? "(межа висоти світу) " : "(вище даху зони) ")
-                    + "Y=" + this.mob.blockPosition().getY() + " roofY=" + zone.getRoofY());
+                    + "Y=" + this.mob.blockPosition().getY() + " roofY(тут)=" + localRoof);
             return;
         }
 
@@ -597,7 +602,12 @@ public class TowerClimbGoal extends Goal {
         // веде моба нікуди (бо шляху до цілі не існує), напрямок кроку не має значення: моб просто
         // стоїть на місці. Тепер і навігація, і крок мосту весь час цілять в ОДНУ безпечну точку,
         // яка завжди досяжна звичайною ходьбою (бо міст під неї щойно добудований).
-        int travelY = Math.max(mobPos.getY(), zone.getRoofY());
+        // ФІКС ("дах до неба по сходах"): локальний дах, а не одне глобальне число - беремо
+        // максимум із "де моб зараз" і "де ціль посадки", щоб траєкторія мосту гарантовано
+        // очищала дах з ОБОХ кінців (вони зазвичай близькі, але не завжди рівні).
+        int travelY = Math.max(mobPos.getY(), Math.max(
+                zone.getLocalRoofY(mobPos.getX(), mobPos.getZ()),
+                zone.getLocalRoofY(landingTarget.getX(), landingTarget.getZ())));
         BlockPos travelTarget = new BlockPos(landingTarget.getX(), travelY, landingTarget.getZ());
 
         this.mob.getNavigation().moveTo(travelTarget.getX() + 0.5, travelTarget.getY(), travelTarget.getZ() + 0.5, 1.0D);

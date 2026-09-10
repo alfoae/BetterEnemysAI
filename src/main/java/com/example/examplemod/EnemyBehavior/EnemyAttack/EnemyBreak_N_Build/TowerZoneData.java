@@ -30,16 +30,36 @@ import java.util.concurrent.ConcurrentHashMap;
  * буфері" (де стоять партикли) СУСІДНІ за побудовою, хай яким великим не рахуй сам reach —
  * потрібне саме окреме, ширше кільце для рішень підйому.
  * <p>
- * <b>Монотонне зростання</b> (навмисно): відсканована площа, обидва буфери (площа+reach і
- * площа+reach+{@link #BUILD_GAP_EXTRA_BLOCKS}) і "дах" зони (roofY) можуть тільки РОСТИ. Якщо
- * гравець тимчасово бере предмет, що збільшує {@code Attributes.ENTITY_INTERACTION_RANGE} чи
- * {@code Attributes.BLOCK_INTERACTION_RANGE}, а потім знімає його — зона лишається такою ж
- * великою, ніби предмет і досі надітий.
+ * <b>Дах — ПОКЛІТИННО, не глобально</b> (живий тест: "сходи в межах прогрузки піднімають зону до
+ * неба, хоча гравець на Y=0"): кожна клітинка {@link #bufferedFootprintXZ} несе ВЛАСНЕ значення
+ * даху, порахованe від НАЙБЛИЖЧОЇ (у радіусі reach) ділянки накопиченої площі — по суті навколо
+ * КОЖНОГО блока площі власне коло радіусом reach, як і навколо КОЖНОГО блока буфера — а не одне
+ * спільне число на всю "ковбасу" відразу. Раніше дах рахувався ОДНИМ глобальним максимумом
+ * (найвища колись відскановану точку + reach) і застосовувався до всієї накопиченої площі
+ * одночасно: досить одного разу зачепити сканом сходинки чи пагорб поруч — і дах злітав над усією
+ * зоною, включно з ділянками, де гравець зараз стоїть на Y=0. Тепер висока ділянка піднімає дах
+ * лише НАД СОБОЮ (і в межах reach навколо себе), а не над усім маршрутом, який гравець колись
+ * пройшов.
+ * <p>
+ * <b>Монотонне зростання</b> (навмисно, тепер ПОКЛІТИННО): відскановану площу і дах кожної
+ * конкретної клітинки можна лише піднімати, ніколи не занижувати в межах життя одного запису.
+ * Якщо гравець тимчасово бере предмет, що збільшує {@code Attributes.ENTITY_INTERACTION_RANGE} чи
+ * {@code Attributes.BLOCK_INTERACTION_RANGE}, а потім знімає його — уже порахована ділянка зони
+ * лишається такою ж великою, ніби предмет і досі надітий. Але це більше не тягне за собою
+ * ВЕСЬ накопичений маршрут: підвищення в одному місці "ковбаси" не чіпає дах в інших її
+ * ділянках.
  * <p>
  * <b>Виняток — {@link #full7x7Center}</b>: НЕ монотонне, завжди СВІЖЕ значення з останнього
  * сканування. Це не про безпеку (як решта зони), а про "чи є зараз зручне місце для короткого
  * заходу" — якщо гравець розібрав свою рівну площадку, вдавати, що вона й досі є, було б
  * помилкою, а не обережністю.
+ * <p>
+ * <b>Забування запису — за часом АБО за живучістю мобів</b> (живий тест: "заагрили на Y=100,
+ * зомбі загинули, за секунди напали знову вже на Y=50 — зона все ще пам'ятає 100"): запис
+ * забувається не лише через {@link #IDLE_FORGET_TICKS} тіш, а й одразу, щойно ЖОДЕН із мобів, що
+ * колись реєструвались активними по цій зоні ({@link #activeMobIds}), більше не живий. Перевірка
+ * лінива (як і решта реєстру) — спрацьовує в момент, коли НАСТУПНИЙ моб намагається скористатись
+ * зоною, тобто рівно тоді, коли стара пам'ять могла б завадити.
  * <p>
  * <b>Об'єднання зон</b>: якщо моб, лізучи до гравця A, БАЧИТЬ напряму (Sensing.hasLineOfSight —
  * той самий метод, що й для "ближчий видимий гравець" в {@link PursuitEnemyBehavior}) гравця B —
@@ -47,8 +67,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * реєстрі вказують на нього: будь-який інший моб, що полізе до A чи до B, читає й доростає той
  * самий спільний запис. Дані не розділяються назад навмисно (як і решта зони — тільки монотонно
  * росте); натомість увесь об'єднаний запис живе/зникає РАЗОМ як одне ціле (один спільний
- * lastTouchedGameTime) — щойно жоден моб довго не торкається жодного з пов'язаних гравців,
- * зникають усі одночасно.
+ * lastTouchedGameTime, один спільний activeMobIds) — щойно жоден моб довго не торкається жодного
+ * з пов'язаних гравців (або всі зареєстровані моби мертві), зникають усі одночасно.
  */
 public final class TowerZoneData {
 
@@ -62,7 +82,9 @@ public final class TowerZoneData {
      * Через скільки тіків БЕЗ жодного дотику (жоден climb-моб не викликав update ні для цього
      * гравця, ні для будь-кого, з ким його зону об'єднано) весь запис забувається — грубе
      * наближення до "поки є заагрений моб, що вміє лізти вгору" (реєстр не бачить усіх мобів
-     * одразу, тому лениво: перевіряємо тільки при читанні/записі, як GlobalSearchGrid).
+     * одразу, тому лениво: перевіряємо тільки при читанні/записі, як GlobalSearchGrid). Це
+     * і досі верхня межа "на про всяк випадок" — фактична смерть усіх зареєстрованих мобів
+     * (див. {@link #activeMobIds}) зазвичай спрацьовує набагато раніше цього таймауту.
      */
     private static final long IDLE_FORGET_TICKS = 60L * 20L; // 60с
 
@@ -80,18 +102,24 @@ public final class TowerZoneData {
     private static final int BUILD_GAP_EXTRA_BLOCKS = 1;
 
     /**
-     * Наскільки вище за "сира поверхня гравця + reach" піднімаємо {@link #roofY}. Впливає ЛИШЕ на
-     * Y (дах зони) - на відміну від {@link #BUILD_GAP_EXTRA_BLOCKS}, тут навмисно НЕ чіпаємо
-     * {@code reachBlocks}, який іде і в {@link #bufferedFootprintXZ}, і в
+     * Наскільки вище за "сира поверхня площі (локально) + reach" піднімаємо дах кожної буферної
+     * клітинки. Впливає ЛИШЕ на Y - на відміну від {@link #BUILD_GAP_EXTRA_BLOCKS}, тут навмисно
+     * НЕ чіпаємо сам {@code reachBlocks}, який іде і в {@link #bufferedFootprintXZ}, і в
      * {@link #buildExclusionXZ} - інакше цей запас поповз би і в X/Z-буфери теж.
      */
     private static final int ROOF_EXTRA_BLOCKS = 1;
 
     private final Map<Long, Integer> platformColumns = new HashMap<>();
-    private final Set<Long> bufferedFootprintXZ = new HashSet<>();
+    /**
+     * xz-ключ -> дах ЦІЄЇ конкретної клітинки (локально, не глобальний максимум - див. клас-джавадок).
+     */
+    private final Map<Long, Integer> bufferedFootprintXZ = new HashMap<>();
     private final Set<Long> buildExclusionXZ = new HashSet<>();
     private final Set<UUID> linkedPlayerIds = new HashSet<>();
-    private int roofY = Integer.MIN_VALUE;
+    /**
+     * Моби, що колись реєструвались як активні по цій зоні - для живучого забування, див. клас-джавадок.
+     */
+    private final Set<UUID> activeMobIds = new HashSet<>();
     private BlockPos full7x7Center;
     private long lastScanGameTime = Long.MIN_VALUE;
     private long lastTouchedGameTime;
@@ -110,14 +138,15 @@ public final class TowerZoneData {
         if (player == null) return null;
 
         long now = level.getGameTime();
-        TowerZoneData zone = resolveOrCreate(player.getUUID(), now);
+        TowerZoneData zone = resolveOrCreate(player.getUUID(), now, level);
+        zone.activeMobIds.add(mob.getUUID()); // "тримає" запис живим, поки сам живий - див. purgeIfStale
         zone.touch(now); // дешево, не залежить від throttle скану нижче
 
         // БАГ, знайдений живим тестом: "now - Long.MIN_VALUE" переповнює long (загортається у
         // ВЕЛИКЕ ВІД'ЄМНЕ число, бо now завжди >=0, а -Long.MIN_VALUE саме собою вже
         // переповнення) - через це умова нижче ніколи не спрацьовувала на найпершому виклику, і
-        // rescan() не викликався ЖОДНОГО РАЗУ (roofY лишався Integer.MIN_VALUE назавжди). Тому
-        // сентинел перевіряємо явно, ДО віднімання, а не покладаємось на арифметику з ним.
+        // rescan() не викликався ЖОДНОГО РАЗУ. Тому сентинел перевіряємо явно, ДО віднімання, а
+        // не покладаємось на арифметику з ним.
         if (zone.lastScanGameTime == Long.MIN_VALUE || now - zone.lastScanGameTime >= SCAN_INTERVAL_TICKS) {
             zone.rescan(level, player, now);
             zone.linkVisibleNearbyPlayers(mob, player, level, now);
@@ -130,24 +159,48 @@ public final class TowerZoneData {
      */
     public static TowerZoneData peek(Player player) {
         long now = player.level().getGameTime();
-        purgeIfStale(player.getUUID(), now);
+        if (player.level() instanceof ServerLevel level) {
+            purgeIfStale(player.getUUID(), now, level);
+        }
         return BY_PLAYER.get(player.getUUID());
     }
 
-    private static TowerZoneData resolveOrCreate(UUID playerId, long now) {
-        purgeIfStale(playerId, now);
+    private static TowerZoneData resolveOrCreate(UUID playerId, long now, ServerLevel level) {
+        purgeIfStale(playerId, now, level);
         TowerZoneData zone = BY_PLAYER.computeIfAbsent(playerId, id -> new TowerZoneData());
         zone.linkedPlayerIds.add(playerId);
         return zone;
     }
 
-    private static void purgeIfStale(UUID playerId, long now) {
+    /**
+     * Забуває весь запис, якщо (а) {@link #IDLE_FORGET_TICKS} ніхто не торкався (як і раніше),
+     * АБО (б) — ФІКС бага "зона пам'ятає висоту навіть після смерті останнього моба" — жоден із
+     * мобів, що колись реєструвались активними по цій зоні ({@link #activeMobIds}), вже не живий.
+     * (б) власне і покриває випадок з живого тесту: заагрили на Y=100, зомбі загинули, за секунди
+     * напали знову вже на Y=50 — перший же виклик {@link #updateForClimbingMob} від НОВОГО моба
+     * бачить, що старих активних мобів більше нема в живих, і стирає стару зону ДО того, як новий
+     * моб встигне щось із неї прочитати чи доростити.
+     */
+    private static void purgeIfStale(UUID playerId, long now, ServerLevel level) {
         TowerZoneData existing = BY_PLAYER.get(playerId);
-        if (existing != null && now - existing.lastTouchedGameTime > IDLE_FORGET_TICKS) {
+        if (existing == null) return;
+
+        boolean timedOut = now - existing.lastTouchedGameTime > IDLE_FORGET_TICKS;
+        boolean noMobsLeftAlive = !existing.activeMobIds.isEmpty() && allDead(existing.activeMobIds, level);
+
+        if (timedOut || noMobsLeftAlive) {
             for (UUID linked : existing.linkedPlayerIds) {
                 BY_PLAYER.remove(linked, existing); // тільки якщо й досі вказує саме на цей об'єкт
             }
         }
+    }
+
+    /**
+     * Заразом прибирає мертві/зниклі UUID із переданого набору - дешева побічна прибирка.
+     */
+    private static boolean allDead(Set<UUID> mobIds, ServerLevel level) {
+        mobIds.removeIf(id -> !(level.getEntity(id) instanceof Mob m) || !m.isAlive());
+        return mobIds.isEmpty();
     }
 
     private static void mergeInto(UUID primaryId, Player other, ServerLevel level, long now) {
@@ -162,9 +215,11 @@ public final class TowerZoneData {
         boolean otherWasNew = (b == null);
         if (b != null && b != merged) {
             merged.platformColumns.putAll(b.platformColumns);
-            merged.bufferedFootprintXZ.addAll(b.bufferedFootprintXZ);
+            for (Map.Entry<Long, Integer> e : b.bufferedFootprintXZ.entrySet()) {
+                merged.bufferedFootprintXZ.merge(e.getKey(), e.getValue(), Math::max);
+            }
             merged.buildExclusionXZ.addAll(b.buildExclusionXZ);
-            merged.roofY = Math.max(merged.roofY, b.roofY);
+            merged.activeMobIds.addAll(b.activeMobIds);
             merged.linkedPlayerIds.addAll(b.linkedPlayerIds);
             merged.lastTouchedGameTime = Math.max(merged.lastTouchedGameTime, b.lastTouchedGameTime);
         }
@@ -185,7 +240,9 @@ public final class TowerZoneData {
     /**
      * Буферизує (Мінковський, диском радіуса reach) лише КРАЙОВІ клітинки площі (ті, в кого хоч
      * один із 4 сусідів — НЕ площа) — запропоноване користувачем спрощення: внутрішні клітинки
-     * однаково повністю перекриті буфером сусідніх крайових, рахувати їх окремо зайве.
+     * однаково повністю перекриті буфером сусідніх крайових, рахувати їх окремо зайве. Версія
+     * "лише членство", без висоти - для {@link #buildExclusionXZ}, якому висота не потрібна
+     * (лише "чи ця колонка взагалі колись потрапляє в буфер").
      */
     private static Set<Long> bufferBoundary(Set<Long> columns, int ceilRadius, double preciseRadius) {
         Set<Long> buffered = new HashSet<>();
@@ -205,6 +262,41 @@ public final class TowerZoneData {
             }
         }
         buffered.addAll(columns); // площа сама по собі теж всередині зони
+        return buffered;
+    }
+
+    /**
+     * Той самий Мінковський-буфер крайових клітинок, але кожна буферна клітинка додатково несе
+     * СВОЄ значення даху (surfaceY цього конкретного джерела + {@code reachBlocks} +
+     * {@link #ROOF_EXTRA_BLOCKS}) - для {@link #bufferedFootprintXZ}. ФІКС бага "дах до неба по
+     * сходах": раніше дах рахувався ОДНИМ числом на всю накопичену площу (глобальний максимум),
+     * тепер - окремо для кожної клітинки, від НАЙБЛИЖЧОЇ (в радіусі reach) ділянки площі. Коли до
+     * однієї клітинки дотягуються диски з РІЗНИХ за висотою ділянок (стик рівнів) - береться
+     * максимум із них: так само "безпечно", як і раніше, але це вже не тягне за собою ввесь
+     * накопичений маршрут гравця, а лише те, що справді поруч.
+     */
+    private static Map<Long, Integer> bufferBoundaryWithRoof(Map<Long, Integer> columns, int reachBlocks, double preciseRadius) {
+        Map<Long, Integer> buffered = new HashMap<>();
+        double radiusSq = preciseRadius * preciseRadius;
+        Set<Long> keys = columns.keySet();
+
+        for (Map.Entry<Long, Integer> col : columns.entrySet()) {
+            int x = PlatformScanner.unpackX(col.getKey());
+            int z = PlatformScanner.unpackZ(col.getKey());
+            if (!isBoundaryCell(keys, x, z)) continue;
+
+            int localRoof = col.getValue() + reachBlocks + ROOF_EXTRA_BLOCKS;
+            for (int dx = -reachBlocks; dx <= reachBlocks; dx++) {
+                for (int dz = -reachBlocks; dz <= reachBlocks; dz++) {
+                    if (dx * (double) dx + dz * (double) dz <= radiusSq) {
+                        buffered.merge(PlatformScanner.key(x + dx, z + dz), localRoof, Math::max);
+                    }
+                }
+            }
+        }
+        for (Map.Entry<Long, Integer> col : columns.entrySet()) { // площа сама по собі теж всередині зони
+            buffered.merge(col.getKey(), col.getValue() + reachBlocks + ROOF_EXTRA_BLOCKS, Math::max);
+        }
         return buffered;
     }
 
@@ -256,14 +348,14 @@ public final class TowerZoneData {
     }
 
     /**
-     * Чи ця позиція (будь-який Y ≤ дах) належить накопиченій (монотонній) зоні — "чесна" лінія,
-     * порахована прямо з reach, БЕЗ {@link #BUILD_GAP_EXTRA_BLOCKS} (та сама, що бачать
-     * партикли). Чисто геометричний факт — виняток "є 7x7, тому не зважай" це рішення Фази 2, не
-     * цього шару.
+     * Чи ця позиція (Y ≤ дах ЦІЄЇ конкретної (x,z)-клітинки) належить накопиченій (монотонній)
+     * зоні — "чесна" лінія, порахована прямо з reach, БЕЗ {@link #BUILD_GAP_EXTRA_BLOCKS} (та
+     * сама, що бачать партикли). Чисто геометричний факт — виняток "є 7x7, тому не зважай" це
+     * рішення Фази 2, не цього шару.
      */
     public boolean isInsideZone(BlockPos pos) {
-        return pos.getY() <= this.roofY
-                && this.bufferedFootprintXZ.contains(PlatformScanner.key(pos.getX(), pos.getZ()));
+        Integer localRoof = this.bufferedFootprintXZ.get(PlatformScanner.key(pos.getX(), pos.getZ()));
+        return localRoof != null && pos.getY() <= localRoof;
     }
 
     /**
@@ -338,27 +430,28 @@ public final class TowerZoneData {
         double cappedReach = PlayerReachUtils.getReachCappedForZoneSizing(player);
         int reachBlocks = (int) Math.ceil(cappedReach);
 
-        int scanMaxY = Integer.MIN_VALUE;
         for (Map.Entry<Long, Integer> entry : result.columns().entrySet()) {
             // МОНОТОННО щодо ЧЛЕНСТВА (ключ ніколи не видаляється), але Y перезаписуємо на
             // актуальний з цього скану - для посадки важливо знати РЕАЛЬНУ поверхню зараз, а не
             // історичну (на відміну від самого факту "ця колонка колись була площею", який має
             // лишатись назавжди заради буфера/безпеки).
             this.platformColumns.put(entry.getKey(), entry.getValue());
-            scanMaxY = Math.max(scanMaxY, entry.getValue());
         }
 
         this.full7x7Center = result.full7x7Center(); // "живе" значення цього скану, див. джавадок класу
 
-        this.bufferedFootprintXZ.addAll(bufferBoundary(this.platformColumns.keySet(), reachBlocks, cappedReach));
+        // ФІКС ("дах до неба по сходах"): дах тепер рахуємо ПОКЛІТИННО від НАЙБЛИЖЧОЇ ділянки
+        // площі, а не одним глобальним максимумом по всій накопиченій площі - див. клас-джавадок
+        // і javadoc bufferBoundaryWithRoof.
+        Map<Long, Integer> freshRoofBuffer = bufferBoundaryWithRoof(this.platformColumns, reachBlocks, cappedReach);
+        for (Map.Entry<Long, Integer> e : freshRoofBuffer.entrySet()) {
+            this.bufferedFootprintXZ.merge(e.getKey(), e.getValue(), Math::max);
+        }
+
         this.buildExclusionXZ.addAll(bufferBoundary(this.platformColumns.keySet(),
                 reachBlocks + BUILD_GAP_EXTRA_BLOCKS, cappedReach + BUILD_GAP_EXTRA_BLOCKS));
 
-        if (scanMaxY != Integer.MIN_VALUE) {
-            this.roofY = Math.max(this.roofY, scanMaxY + reachBlocks + ROOF_EXTRA_BLOCKS); // МОНОТОННО - лише max
-        }
-
-        debugReport(level, result, attackRange, blockRange, rawReach, cappedReach);
+        debugReport(level, player, result, attackRange, blockRange, rawReach, cappedReach);
     }
 
     private boolean allNeighborsKnown(int x, int z) {
@@ -390,7 +483,7 @@ public final class TowerZoneData {
             return new BlockPos(toXZ.getX(), travelY, toXZ.getZ());
         }
 
-        if (!this.bufferedFootprintXZ.contains(fromKey)) {
+        if (!this.bufferedFootprintXZ.containsKey(fromKey)) {
             Long nearest = nearestZoneCellKey(fromXZ.getX(), fromXZ.getZ());
             BlockPos towards = nearest != null
                     ? new BlockPos(PlatformScanner.unpackX(nearest), travelY, PlatformScanner.unpackZ(nearest))
@@ -399,7 +492,7 @@ public final class TowerZoneData {
         }
 
         long targetKey = toKey;
-        if (!this.bufferedFootprintXZ.contains(targetKey)) {
+        if (!this.bufferedFootprintXZ.containsKey(targetKey)) {
             Long nearest = nearestZoneCellKey(toXZ.getX(), toXZ.getZ());
             if (nearest == null)
                 return straightHorizontalStep(fromXZ, toXZ, travelY); // зона порожня - не мало б статись
@@ -418,7 +511,7 @@ public final class TowerZoneData {
     private Long nearestZoneCellKey(int x, int z) {
         Long best = null;
         long bestDistSq = Long.MAX_VALUE;
-        for (long key : this.bufferedFootprintXZ) {
+        for (long key : this.bufferedFootprintXZ.keySet()) {
             long dx = PlatformScanner.unpackX(key) - x;
             long dz = PlatformScanner.unpackZ(key) - z;
             long distSq = dx * dx + dz * dz;
@@ -454,7 +547,7 @@ public final class TowerZoneData {
                     PlatformScanner.key(cx, cz + 1), PlatformScanner.key(cx, cz - 1)
             };
             for (long next : neighbors) {
-                if (!this.bufferedFootprintXZ.contains(next) || cameFrom.containsKey(next)) continue;
+                if (!this.bufferedFootprintXZ.containsKey(next) || cameFrom.containsKey(next)) continue;
                 cameFrom.put(next, current);
                 queue.add(next);
             }
@@ -473,24 +566,39 @@ public final class TowerZoneData {
         return this.full7x7Center;
     }
 
-    public int getRoofY() {
-        return this.roofY;
+    /**
+     * Дах ЗОНИ, локальний для конкретної (x,z)-колонки — на відміну від старого глобального
+     * roofY, кожна ділянка "ковбаси" тепер несе власну висоту (див. клас-джавадок). Якщо сама
+     * колонка не в буфері (звичний випадок для мобової pillarColumn — вона за побудовою ЗА межею
+     * буфера, бо {@code isColumnInsideFootprint} мусить бути false, щоб моб узагалі туди
+     * закомітився), береться дах НАЙБЛИЖЧОЇ буферної клітинки — саме туди моб і буде мостити.
+     * {@code Integer.MIN_VALUE}, якщо зона взагалі порожня (не мало б траплятись, поки
+     * TowerClimbGoal її використовує).
+     */
+    public int getLocalRoofY(int x, int z) {
+        long key = PlatformScanner.key(x, z);
+        Integer direct = this.bufferedFootprintXZ.get(key);
+        if (direct != null) return direct;
+        Long nearest = nearestZoneCellKey(x, z);
+        return nearest != null ? this.bufferedFootprintXZ.get(nearest) : Integer.MIN_VALUE;
     }
 
     // ТИМЧАСОВИЙ DEBUG: текстовий звіт УСІМ гравцям, чиї зони зараз об'єднані сюди (щоб було видно
     // й саме об'єднання), + часточки по периметру буферної зони. Прибрати разом з рештою
     // debugMsg-викликів після тестування Фази 1.
-    private void debugReport(ServerLevel level, PlatformScanner.Result result,
+    private void debugReport(ServerLevel level, Player player, PlatformScanner.Result result,
                              double attackRange, double blockRange, double rawReach, double cappedReach) {
+        BlockPos here = player.getOnPos().above();
+        int localRoofHere = getLocalRoofY(here.getX(), here.getZ());
         String msg = String.format(
                 "[DEBUG TowerZone] скан=%d_клітинок 7x7=%s атака/блоки=%.1f/%.1f reach(комб.сирий/кеп)=%.1f/%.1f "
-                        + "площа(накоп)=%d буфер_партиклів(накоп)=%d буфер_будівництва(накоп)=%d roofY=%d "
-                        + "гравців_в_зоні=%d",
+                        + "площа(накоп)=%d буфер_партиклів(накоп)=%d буфер_будівництва(накоп)=%d roofY(тут)=%d "
+                        + "активних_мобів=%d гравців_в_зоні=%d",
                 result.columns().size(),
                 result.full7x7Center() != null ? result.full7x7Center().toShortString() : "нема",
                 attackRange, blockRange, rawReach, cappedReach,
                 this.platformColumns.size(), this.bufferedFootprintXZ.size(), this.buildExclusionXZ.size(),
-                this.roofY, this.linkedPlayerIds.size());
+                localRoofHere, this.activeMobIds.size(), this.linkedPlayerIds.size());
 
         for (UUID id : this.linkedPlayerIds) {
             Player p = level.getServer().getPlayerList().getPlayer(id);
@@ -504,11 +612,11 @@ public final class TowerZoneData {
 
     private void spawnBoundaryParticles(ServerLevel level) {
         int shown = 0;
-        for (long key : this.bufferedFootprintXZ) {
-            int x = PlatformScanner.unpackX(key);
-            int z = PlatformScanner.unpackZ(key);
-            if (!isBoundaryCell(this.bufferedFootprintXZ, x, z)) continue;
-            level.sendParticles(ParticleTypes.END_ROD, x + 0.5, this.roofY + 0.2, z + 0.5,
+        for (Map.Entry<Long, Integer> entry : this.bufferedFootprintXZ.entrySet()) {
+            int x = PlatformScanner.unpackX(entry.getKey());
+            int z = PlatformScanner.unpackZ(entry.getKey());
+            if (!isBoundaryCell(this.bufferedFootprintXZ.keySet(), x, z)) continue;
+            level.sendParticles(ParticleTypes.END_ROD, x + 0.5, entry.getValue() + 0.2, z + 0.5,
                     1, 0.0, 0.0, 0.0, 0.0);
             if (++shown > 400) break; // запобіжник - не спамити пакетами на дуже великій зоні
         }
