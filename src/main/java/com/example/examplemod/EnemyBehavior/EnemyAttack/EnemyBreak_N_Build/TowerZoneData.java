@@ -116,9 +116,7 @@ public final class TowerZoneData {
     private final Map<Long, Integer> bufferedFootprintXZ = new HashMap<>();
     private final Set<Long> buildExclusionXZ = new HashSet<>();
     private final Set<UUID> linkedPlayerIds = new HashSet<>();
-    /**
-     * Моби, що колись реєструвались як активні по цій зоні - для живучого забування, див. клас-джавадок.
-     */
+    /** Моби, що колись реєструвались як активні по цій зоні - для живучого забування, див. клас-джавадок. */
     private final Set<UUID> activeMobIds = new HashSet<>();
     private BlockPos full7x7Center;
     private long lastScanGameTime = Long.MIN_VALUE;
@@ -195,9 +193,7 @@ public final class TowerZoneData {
         }
     }
 
-    /**
-     * Заразом прибирає мертві/зниклі UUID із переданого набору - дешева побічна прибирка.
-     */
+    /** Заразом прибирає мертві/зниклі UUID із переданого набору - дешева побічна прибирка. */
     private static boolean allDead(Set<UUID> mobIds, ServerLevel level) {
         mobIds.removeIf(id -> !(level.getEntity(id) instanceof Mob m) || !m.isAlive());
         return mobIds.isEmpty();
@@ -416,6 +412,15 @@ public final class TowerZoneData {
     }
 
     private void rescan(ServerLevel level, Player player, long now) {
+        // ФІКС (живий тест: "стрибаю - зона росте на 2 блоки, не на 1"): getOnPos() під час
+        // польоту (не на землі) - це НЕ реальна опорна поверхня, а груба floor(поточний_Y - 0.2)
+        // від фактичної висоти гравця в повітрі; на звичайному стрибку без буста (~1.25 блока)
+        // саме через це заокруглення воно може стрибнути одразу на 2, а не на 1, залежно від
+        // дробової частини Y, з якої стрибок почався. lastScanGameTime свідомо НЕ чіпаємо -
+        // наступний тік одразу спробує ще раз (а не жде повний новий SCAN_INTERVAL_TICKS), тож
+        // це лише невелика затримка до приземлення, а не пропущене сканування.
+        if (!player.onGround()) return;
+
         this.lastScanGameTime = now;
 
         BlockPos standingPos = player.getOnPos().above();
