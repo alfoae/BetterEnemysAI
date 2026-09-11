@@ -11,7 +11,7 @@ import net.neoforged.neoforge.event.entity.EntityAttributeModificationEvent;
 
 public class ChangeEnemiesAttributes {
 
-    public static final String MODID = "betterenemysai";
+    public static final String MODID = "betterenemiesai";
 
     public ChangeEnemiesAttributes(IEventBus modEventBus) {
         modEventBus.addListener(this::modifyAttributes);
