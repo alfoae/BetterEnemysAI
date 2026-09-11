@@ -1,7 +1,7 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.utils.AdvancedAimMath;
-import com.example.examplemod.utils.PlayerVelocityTracker;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.AdvancedAimMath;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.PlayerVelocityTracker;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.monster.breeze.Breeze;

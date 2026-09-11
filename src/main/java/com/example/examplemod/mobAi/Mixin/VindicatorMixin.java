@@ -1,10 +1,10 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyMeleeBehavior;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyMeleeBehavior;
+import com.example.examplemod.Enemy.EnemyInventory.EnemySwap_N_UseWeapon.IdleCrossbowGoal;
+import com.example.examplemod.Enemy.EnemyInventory.EnemySwap_N_UseWeapon.SwapWeaponGoal;
 import com.example.examplemod.mobAi.Goal.BetterPillagerVindicatorGoalAi;
-import com.example.examplemod.mobAi.Goal.IdleCrossbowGoal;
-import com.example.examplemod.mobAi.Goal.SwapWeaponGoal;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.monster.AbstractIllager;

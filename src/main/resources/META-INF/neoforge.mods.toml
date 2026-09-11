@@ -21,7 +21,7 @@ license="${mod_license}"
 [[mods]] #mandatory
 
 # The modid of the mod
-modId = "betterenemysai" #mandatory
+modId = "betterenemiesai" #mandatory
 
 # The version number of the mod
 version="${mod_version}" #mandatory
@@ -61,7 +61,7 @@ Example mod description.
 # The coremods config file path is not configurable and is always loaded from META-INF/coremods.json
 
 # A dependency - use the . to indicate dependency for a specific modid. Dependencies are optional.
-[[dependencies."betterenemysai"]]
+[[dependencies."betterenemiesai"]]
 modId = "neoforge"
 type = "required"
 
@@ -70,7 +70,7 @@ ordering = "NONE"
 side = "BOTH"
 
 # Here's another dependency
-[[dependencies."betterenemysai"]]
+[[dependencies."betterenemiesai"]]
 modId = "minecraft"
 type = "required"
 # This version range declares a minimum of the current minecraft version up to but not including the next major version
@@ -79,7 +79,7 @@ ordering = "NONE"
 side = "BOTH"
 
 [[mixins]]
-config = "mixins.betterenemysai.json"
+config = "mixins.betterenemiesai.json"
 
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't

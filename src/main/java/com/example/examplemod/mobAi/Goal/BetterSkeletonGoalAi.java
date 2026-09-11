@@ -1,9 +1,10 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
-import com.example.examplemod.EnemyBehavior.EnemyFactionRegistry;
-import com.example.examplemod.utils.AdvancedAimMath;
-import com.example.examplemod.utils.ProjectileTrajectory;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.AdvancedAimMath;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.PlayerVelocityTracker;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.ProjectileTrajectory;
+import com.example.examplemod.Enemy.EnemyFactionRegistry;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.AbstractSkeleton;
@@ -160,7 +161,7 @@ public class BetterSkeletonGoalAi extends Goal {
             } else if (canSee) {
                 int useTime = this.mob.getTicksUsingItem();
                 if (useTime >= 20) {
-                    Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
+                    Vec3 realVel = PlayerVelocityTracker.getRealVelocity(target);
                     AdvancedAimMath.AimResult aim = ProjectileTrajectory.resolveBallisticAimWithMissCheck(
                             this.mob, target, 3.0f, realVel.scale(1.8), 0.25
                     );

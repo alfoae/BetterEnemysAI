@@ -1,6 +1,7 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.utils.ProjectileTrajectory;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.PlayerVelocityTracker;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.ProjectileTrajectory;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -89,7 +90,7 @@ public class BetterBlazeGoalAi extends Goal {
         double flightTime = this.blaze.position().distanceTo(targetCenter) / projectileSpeed;
 
         // Коефіцієнт випередження
-        Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
+        Vec3 realVel = PlayerVelocityTracker.getRealVelocity(target);
         Vec3 adjustedVel = realVel.scale(2.2);
         Vec3 predictedPos = targetCenter.add(adjustedVel.scale(flightTime));
 

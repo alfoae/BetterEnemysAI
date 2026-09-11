@@ -1,8 +1,8 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.BetterEnemysAI;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyMeleeBehavior;
+import com.example.examplemod.BetterEnemiesAI;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyMeleeBehavior;
 import com.example.examplemod.mobAi.Goal.BetterDrownedGoalAi;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
@@ -33,7 +33,7 @@ public class DrownedMixin {
         boolean alreadyAdded = drowned.goalSelector.getAvailableGoals().stream()
                 .anyMatch(g -> g.getGoal() instanceof PursuitEnemyBehavior);
         if (alreadyAdded) {
-            BetterEnemysAI.LOGGER.warn("DrownedMixin: replaceDrownedTridentGoal fired more than once "
+            BetterEnemiesAI.LOGGER.warn("DrownedMixin: replaceDrownedTridentGoal fired more than once "
                     + "for {} -- populateDefaultEquipmentSlots called >1 time, skipping duplicate", drowned);
             return;
         }

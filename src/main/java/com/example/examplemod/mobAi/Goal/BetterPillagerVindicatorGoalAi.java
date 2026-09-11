@@ -1,8 +1,8 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.utils.AdvancedAimMath;
-import com.example.examplemod.utils.PlayerVelocityTracker;
-import com.example.examplemod.utils.ProjectileTrajectory;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.AdvancedAimMath;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.PlayerVelocityTracker;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.ProjectileTrajectory;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;

@@ -1,9 +1,9 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.BuildPathGoal;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.DigThroughWallsGoal;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.TowerClimbGoal;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build.BuildPathGoal;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build.DigThroughWallsGoal;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build.TowerClimbGoal;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
 import com.example.examplemod.mobAi.Goal.BetterZombieGoalAi;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.monster.Drowned;

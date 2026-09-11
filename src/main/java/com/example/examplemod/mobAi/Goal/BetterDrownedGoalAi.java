@@ -1,8 +1,9 @@
 package com.example.examplemod.mobAi.Goal;
 
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
-import com.example.examplemod.utils.AdvancedAimMath;
-import com.example.examplemod.utils.ProjectileTrajectory;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.AdvancedAimMath;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.PlayerVelocityTracker;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyShootAhead.ProjectileTrajectory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Drowned;
@@ -171,7 +172,7 @@ public class BetterDrownedGoalAi extends Goal {
                     }
 
                     // 1. Отримуємо чистий вектор швидкості з трекера
-                    Vec3 realVel = com.example.examplemod.utils.PlayerVelocityTracker.getRealVelocity(target);
+                    Vec3 realVel = PlayerVelocityTracker.getRealVelocity(target);
 
                     AdvancedAimMath.AimResult aim;
 

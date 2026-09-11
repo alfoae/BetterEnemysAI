@@ -1,11 +1,11 @@
 package com.example.examplemod.event;
 
-import com.example.examplemod.BetterEnemysAI;
+import com.example.examplemod.BetterEnemiesAI;
 import com.example.examplemod.Config;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.DigBlockResolver;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.MiningTierData;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyBreak_N_Build.TemporaryBlockData;
-import com.example.examplemod.utils.IMobBlockStorage;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build.DigBlockResolver;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build.MiningTierData;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build.TemporaryBlockData;
+import com.example.examplemod.Enemy.EnemyInventory.EnemyStorage.IMobBlockStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -43,7 +43,7 @@ public class EnemyBreak_N_BuildEvents {
         ResourceLocation id = event.getAdvancement().id();
         MiningTierData data = MiningTierData.get(event.getEntity().level().getServer());
         if (data.tryUpgrade(id)) {
-            BetterEnemysAI.LOGGER.info("EnemyBreak_N_Build: mining tier піднято до {} (досягнення {})",
+            BetterEnemiesAI.LOGGER.info("EnemyBreak_N_Build: mining tier піднято до {} (досягнення {})",
                     data.getTier(), id);
         }
     }

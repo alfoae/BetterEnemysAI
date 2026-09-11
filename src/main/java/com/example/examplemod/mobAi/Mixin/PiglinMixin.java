@@ -1,12 +1,12 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.BetterEnemysAI;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitBrainBridgeGoal;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemyPursuit_N_Search.PursuitEnemyBehavior;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySwap_N_UseWeapon.EnemySwap_and_UseWeaponConditionalBehavior;
-import com.example.examplemod.EnemyBehavior.EnemyAttack.EnemySwap_N_UseWeapon.PiglinSwapWeaponBehavior;
+import com.example.examplemod.BetterEnemiesAI;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitBrainBridgeGoal;
+import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyInventory.EnemySwap_N_UseWeapon.EnemySwap_and_UseWeaponConditionalBehavior;
+import com.example.examplemod.Enemy.EnemyInventory.EnemySwap_N_UseWeapon.IdleCrossbowGoal;
+import com.example.examplemod.Enemy.EnemyInventory.EnemySwap_N_UseWeapon.PiglinSwapWeaponBehavior;
 import com.example.examplemod.mobAi.Goal.BetterPiglinGoalAi;
-import com.example.examplemod.mobAi.Goal.IdleCrossbowGoal;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.monster.piglin.Piglin;
@@ -97,7 +97,7 @@ class PiglinGoalMixin {
         boolean alreadyAdded = piglin.goalSelector.getAvailableGoals().stream()
                 .anyMatch(g -> g.getGoal() instanceof PursuitEnemyBehavior);
         if (alreadyAdded) {
-            BetterEnemysAI.LOGGER.warn("PiglinGoalMixin: addPursuitSystem fired more than once for {} "
+            BetterEnemiesAI.LOGGER.warn("PiglinGoalMixin: addPursuitSystem fired more than once for {} "
                     + "-- <init> matched more than one constructor, skipping duplicate", piglin);
             return;
         }

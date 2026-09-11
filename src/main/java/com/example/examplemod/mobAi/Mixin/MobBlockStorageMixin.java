@@ -1,6 +1,6 @@
 package com.example.examplemod.mobAi.Mixin;
 
-import com.example.examplemod.utils.IMobBlockStorage;
+import com.example.examplemod.Enemy.EnemyInventory.EnemyStorage.IMobBlockStorage;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
