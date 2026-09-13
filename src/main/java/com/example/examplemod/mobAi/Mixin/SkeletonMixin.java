@@ -20,7 +20,7 @@ public class SkeletonMixin {
                 goal.getGoal() instanceof RangedBowAttackGoal
         );
 
-        skeleton.goalSelector.addGoal(0, new PursuitEnemyBehavior(skeleton, true, 1.0));
+        skeleton.goalSelector.addGoal(0, new PursuitEnemyBehavior(skeleton, true));
         skeleton.goalSelector.addGoal(1, new BetterSkeletonGoalAi(skeleton, 1.0D, 20));
     }
 }

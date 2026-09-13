@@ -2,6 +2,7 @@ package com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build;
 
 import com.example.examplemod.Config;
 import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyMovement.Run_N_Jump.Run_N_JumpUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -136,6 +137,18 @@ public class TowerClimbGoal extends Goal {
 
     @Override
     public void tick() {
+        // Дефолт бігу — АЛЕ НЕ в CLIMBING/CROSS_AND_DIG: там mob.getJumpControl().jump()
+        // використовується ЛИШЕ для вертикального підйому по одній колонці (пілар/вихід крізь
+        // пробиту стелю), а ванільний LivingEntity#jumpFromGround() додає горизонтальний поштовх
+        // УПЕРЕД (за поточним yRot) щоразу, коли isSprinting()==true в момент стрибка — саме
+        // звідси видимий "стрибає трохи вперед", хоча по X/Z моб мав лишитись на місці. У решті
+        // стадій (TO_7X7, SIDESTEP, BRIDGE_TO_PLAYER) рух дійсно горизонтальний, тож дефолт біжить.
+        if (this.stage == Stage.CLIMBING || this.stage == Stage.CROSS_AND_DIG) {
+            this.mob.setSprinting(false);
+        } else {
+            Run_N_JumpUtils.applyDefaultRun(this.mob);
+        }
+
         if (!(this.mob.level() instanceof ServerLevel level)) return;
         Player player = PursuitEnemyBehavior.getTrackedPlayer(this.mob);
         if (player == null) return;
@@ -261,7 +274,8 @@ public class TowerClimbGoal extends Goal {
         }
 
         this.mob.getNavigation().moveTo(
-                this.target7x7.getX() + 0.5, this.target7x7.getY(), this.target7x7.getZ() + 0.5, 1.0D);
+                this.target7x7.getX() + 0.5, this.target7x7.getY(), this.target7x7.getZ() + 0.5,
+                Run_N_JumpUtils.getRunSpeedModifier(this.mob));
     }
 
     /**
@@ -610,7 +624,8 @@ public class TowerClimbGoal extends Goal {
                 zone.getLocalRoofY(landingTarget.getX(), landingTarget.getZ())));
         BlockPos travelTarget = new BlockPos(landingTarget.getX(), travelY, landingTarget.getZ());
 
-        this.mob.getNavigation().moveTo(travelTarget.getX() + 0.5, travelTarget.getY(), travelTarget.getZ() + 0.5, 1.0D);
+        this.mob.getNavigation().moveTo(travelTarget.getX() + 0.5, travelTarget.getY(), travelTarget.getZ() + 0.5,
+                Run_N_JumpUtils.getRunSpeedModifier(this.mob));
 
         if (--this.actionCooldown > 0) return;
         this.actionCooldown = ACTION_COOLDOWN_TICKS;
@@ -651,7 +666,8 @@ public class TowerClimbGoal extends Goal {
         double dz = targetColumn.getZ() - mobPos.getZ();
         if (dx * dx + dz * dz <= NAV_ARRIVE_DIST_SQ) return true;
 
-        this.mob.getNavigation().moveTo(targetColumn.getX() + 0.5, mobPos.getY(), targetColumn.getZ() + 0.5, 1.0D);
+        this.mob.getNavigation().moveTo(targetColumn.getX() + 0.5, mobPos.getY(), targetColumn.getZ() + 0.5,
+                Run_N_JumpUtils.getRunSpeedModifier(this.mob));
 
         BlockPos step = EnemyBreak_N_BuildUtils.nextHorizontalStep(this.mob, targetColumn);
         neutralizeHazardIfPlayerPlaced(level, step);

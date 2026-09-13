@@ -3,6 +3,7 @@ package com.example.examplemod.mobAi.Goal;
 import com.example.examplemod.Enemy.EnemyAttack.DrownedTridentAttack;
 import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
 import com.example.examplemod.Enemy.EnemyMovement.DrownedAmphibiousMovement;
+import com.example.examplemod.Enemy.EnemyMovement.Run_N_Jump.Run_N_JumpUtils;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Drowned;
@@ -90,7 +91,7 @@ public class BetterDrownedGoalAi extends Goal {
                 this.mob.stopUsingItem(); // не тримаємо тризуб натягнутим, поки біжимо всліпу
             }
             this.mob.setSwimming(this.mob.isInWater());
-            double sprintSpeed = PursuitEnemyBehavior.getSprintSpeedModifier(this.mob);
+            double sprintSpeed = Run_N_JumpUtils.getRunSpeedModifier(this.mob);
             this.mob.getNavigation().moveTo(chasePos.x, chasePos.y, chasePos.z, sprintSpeed);
             this.mob.getLookControl().setLookAt(
                     chasePos.x, chasePos.y + this.mob.getBbHeight() * 0.5, chasePos.z, 30.0F, 30.0F);

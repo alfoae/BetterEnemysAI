@@ -1,6 +1,7 @@
 package com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior;
 
 import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.Search_Grid.SearchGrid;
+import com.example.examplemod.Enemy.EnemyMovement.Run_N_Jump.Run_N_JumpUtils;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -76,41 +77,17 @@ public class PursuitEnemyBehavior extends Goal {
      * коли моб деспавнився/вивантажився і на нього більше немає сильних посилань).
      */
     private static final Map<Mob, MemoryData> MEMORY = new WeakHashMap<>();
-    /**
-     * Зберігає sprintSpeedModifier для кожного моба — читається Goal-ами через getSprintSpeedModifier.
-     */
-    private static final Map<Mob, Double> SPRINT_SPEED = new WeakHashMap<>();
     private final Mob mob;
     private final boolean supportsSearchBehavior;
-    /**
-     * Множник швидкості для moveTo під час бігу до застиглої точки (GOING_TO_LAST_SEEN) або
-     * пошуку (SEARCHING). Задається при реєстрації Goal-у в BetterEnemysBehavior окремо для
-     * кожного моба. Зчитується стрілецькими/мелі Goal-ами через getSprintSpeedModifier(mob).
-     */
-    private final double sprintSpeedModifier;
 
     public PursuitEnemyBehavior(Mob mob) {
-        this(mob, false, 1.4);
+        this(mob, false);
     }
 
     public PursuitEnemyBehavior(Mob mob, boolean supportsSearchBehavior) {
-        this(mob, supportsSearchBehavior, 1.4);
-    }
-
-    public PursuitEnemyBehavior(Mob mob, boolean supportsSearchBehavior, double sprintSpeedModifier) {
         this.mob = mob;
         this.supportsSearchBehavior = supportsSearchBehavior;
-        this.sprintSpeedModifier = sprintSpeedModifier;
-        SPRINT_SPEED.put(mob, sprintSpeedModifier);
         this.setFlags(EnumSet.noneOf(Goal.Flag.class));
-    }
-
-    /**
-     * Множник швидкості для moveTo під час бігу — для використання в Goal-ах стрільби/мелі.
-     * Повертає 1.0 якщо моб не має зареєстрованого PursuitEnemyBehavior.
-     */
-    public static double getSprintSpeedModifier(Mob mob) {
-        return SPRINT_SPEED.getOrDefault(mob, 1.0);
     }
 
     /**
@@ -293,6 +270,12 @@ public class PursuitEnemyBehavior extends Goal {
 
     @Override
     public void tick() {
+        // Дефолт бігу: sprint = заагрений в БУДЬ-ЯКОМУ з активних станів (CHASING/
+        // GOING_TO_LAST_SEEN/SEARCHING), незалежно від того, яка саме поведінка зараз керує
+        // рухом. Читає стан як він був на ПОЧАТОК цього тіку (тобто з попереднього тіку) —
+        // затримка в 1 тік (~50мс) на суто візуальному прапорці непомітна й нічого не ламає.
+        Run_N_JumpUtils.applyDefaultRun(this.mob);
+
         boolean isNewEntry = !MEMORY.containsKey(this.mob); // ТИМЧАСОВИЙ DEBUG
         MemoryData data = MEMORY.computeIfAbsent(this.mob, m -> new MemoryData());
 
@@ -313,10 +296,6 @@ public class PursuitEnemyBehavior extends Goal {
         // GOING_TO_LAST_SEEN і SEARCHING мають свою окрему логіку тіку.
         if (data.state == State.GOING_TO_LAST_SEEN) {
             tickGoingToLastSeen(data);
-            // Спринт для мелі-мобів під час бігу до точки.
-            if (!supportsSearchBehavior) {
-                this.mob.setSprinting(true);
-            }
             return;
         }
         if (data.state == State.SEARCHING) {
@@ -335,9 +314,6 @@ public class PursuitEnemyBehavior extends Goal {
                         "[DEBUG] findCandidatePlayer()=null. mob.getTarget()=%s стан_памяті=%s моб=%s",
                         this.mob.getTarget() != null ? this.mob.getTarget().getName().getString() : "null",
                         data.state, this.mob.blockPosition()));
-            }
-            if (!supportsSearchBehavior) {
-                this.mob.setSprinting(false);
             }
             return;
         }
@@ -366,11 +342,6 @@ public class PursuitEnemyBehavior extends Goal {
             data.state = State.CHASING;
             data.trackedPlayer = player;
             reinforceTarget(player);
-            // Мелі-моби спринтують завжди коли заагрені (стан CHASING).
-            // Для мобів зі стрільбою (supportsSearchBehavior) спринт керується їх власним Goal-ом.
-            if (!supportsSearchBehavior) {
-                this.mob.setSprinting(true);
-            }
             // Оновлюємо lastVisiblePos ТІЛЬКИ коли моб реально бачить гравця (не через стіну).
             if (this.mob.getSensing().hasLineOfSight(player)) {
                 data.lastVisiblePos = player.position();
@@ -603,9 +574,6 @@ public class PursuitEnemyBehavior extends Goal {
             data.searchGrid.discardDebugMarker();
         }
         data.searchGrid = null;
-        if (!supportsSearchBehavior) {
-            this.mob.setSprinting(false);
-        }
         if (this.mob.getTarget() instanceof Player) {
             this.mob.setTarget(null);
         }

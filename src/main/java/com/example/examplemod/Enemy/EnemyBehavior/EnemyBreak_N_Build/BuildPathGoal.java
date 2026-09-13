@@ -1,6 +1,7 @@
 package com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build;
 
 import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyMovement.Run_N_Jump.Run_N_JumpUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
@@ -109,6 +110,10 @@ public class BuildPathGoal extends Goal {
 
     @Override
     public void tick() {
+        // Цей Goal активний лише поки canOperate()==true (живе переслідування) — моб має бігти,
+        // поки прокладає шлях/піларить до гравця.
+        Run_N_JumpUtils.applyDefaultRun(this.mob);
+
         if (!(this.mob.level() instanceof ServerLevel level)) return;
 
         Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
@@ -186,7 +191,8 @@ public class BuildPathGoal extends Goal {
         }
 
         this.mob.getNavigation().moveTo(
-                this.buildTarget.getX() + 0.5, this.buildTarget.getY(), this.buildTarget.getZ() + 0.5, 1.0D);
+                this.buildTarget.getX() + 0.5, this.buildTarget.getY(), this.buildTarget.getZ() + 0.5,
+                Run_N_JumpUtils.getRunSpeedModifier(this.mob));
     }
 
     private boolean needsClimb(BlockPos target) {

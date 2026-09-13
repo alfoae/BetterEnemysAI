@@ -1,6 +1,7 @@
 package com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior;
 
 import com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build.EnemyBreak_N_BuildUtils;
+import com.example.examplemod.Enemy.EnemyMovement.Run_N_Jump.Run_N_JumpUtils;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -204,7 +205,7 @@ public class PursuitEnemyMeleeBehavior extends Goal {
             return;
         }
 
-        double sprintSpeed = PursuitEnemyBehavior.getSprintSpeedModifier(this.mob);
+        double sprintSpeed = Run_N_JumpUtils.getRunSpeedModifier(this.mob);
 
         // chasePos — ЗАВЖДИ правильна точка руху для всіх трьох активних станів (жива позиція
         // в CHASING, застигла точка в GOING_TO_LAST_SEEN, точка пошуку в SEARCHING). НЕ звіряємось
@@ -226,7 +227,7 @@ public class PursuitEnemyMeleeBehavior extends Goal {
         this.mob.getNavigation().moveTo(sharedPath, sprintSpeed);
         this.mob.getLookControl().setLookAt(
                 chasePos.x, chasePos.y + this.mob.getBbHeight() * 0.5, chasePos.z, 30.0F, 30.0F);
-        this.mob.setSprinting(true);
+        Run_N_JumpUtils.applyDefaultRun(this.mob);
 
         // А атака — дійсно тільки коли реально бачимо ціль, незалежно від того, з якого
         // стану взявся chasePos.

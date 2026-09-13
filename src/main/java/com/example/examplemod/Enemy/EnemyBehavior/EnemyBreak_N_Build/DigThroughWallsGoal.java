@@ -1,6 +1,7 @@
 package com.example.examplemod.Enemy.EnemyBehavior.EnemyBreak_N_Build;
 
 import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyMovement.Run_N_Jump.Run_N_JumpUtils;
 import com.example.examplemod.event.EnemyBreak_N_BuildEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -97,6 +98,10 @@ public class DigThroughWallsGoal extends Goal {
 
     @Override
     public void tick() {
+        // Цей Goal активний лише поки canOperate()==true (живе переслідування/GOING_TO_LAST_SEEN) —
+        // моб має бігти, поки прокопує стіну до гравця.
+        Run_N_JumpUtils.applyDefaultRun(this.mob);
+
         if (!(this.mob.level() instanceof ServerLevel level)) return;
 
         Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
@@ -172,7 +177,8 @@ public class DigThroughWallsGoal extends Goal {
         this.mob.getLookControl().setLookAt(
                 this.digTarget.getX() + 0.5, this.digTarget.getY() + 0.5, this.digTarget.getZ() + 0.5, 30.0F, 30.0F);
         this.mob.getNavigation().moveTo(
-                this.digTarget.getX() + 0.5, this.digTarget.getY(), this.digTarget.getZ() + 0.5, 1.0D);
+                this.digTarget.getX() + 0.5, this.digTarget.getY(), this.digTarget.getZ() + 0.5,
+                Run_N_JumpUtils.getRunSpeedModifier(this.mob));
     }
 
     /**

@@ -29,7 +29,7 @@ public class PillagerMixin {
                 goal.getGoal() instanceof MeleeAttackGoal
         );
 
-        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true, 1.0));
+        mob.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
         mob.goalSelector.addGoal(1, new SwapWeaponGoal(mob));
         mob.goalSelector.addGoal(2, new BetterPillagerVindicatorGoalAi(mob));
         mob.goalSelector.addGoal(3, new PursuitEnemyMeleeBehavior(mob, 1.2D,

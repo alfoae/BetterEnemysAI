@@ -34,7 +34,7 @@ public abstract class VindicatorMixin extends AbstractIllager {
                 goal.getGoal() instanceof MeleeAttackGoal
         );
 
-        this.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true, 1.0));
+        this.goalSelector.addGoal(0, new PursuitEnemyBehavior(mob, true));
         this.goalSelector.addGoal(1, new SwapWeaponGoal(mob));
         this.goalSelector.addGoal(2, new BetterPillagerVindicatorGoalAi(mob));
         this.goalSelector.addGoal(3, new PursuitEnemyMeleeBehavior(mob, 1.2D,

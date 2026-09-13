@@ -1,6 +1,7 @@
 package com.example.examplemod.Enemy.EnemyMovement;
 
 import com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior.PursuitEnemyBehavior;
+import com.example.examplemod.Enemy.EnemyMovement.Run_N_Jump.Run_N_JumpUtils;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.AbstractSkeleton;
 import net.minecraft.world.phys.Vec3;
@@ -39,7 +40,7 @@ public class SkeletonStrafeMovement {
         Vec3 chasePos = PursuitEnemyBehavior.getChasePosition(this.mob);
 
         // Швидкість бігу береться з PursuitEnemyBehavior (задається при реєстрації в BetterEnemysBehavior).
-        double sprintSpeed = PursuitEnemyBehavior.getSprintSpeedModifier(this.mob);
+        double sprintSpeed = Run_N_JumpUtils.getRunSpeedModifier(this.mob);
         double currentSpeed = (memoryChasing && !canSee) ? sprintSpeed : this.speedModifier;
 
         // Логіка переміщення (ванільний стрейф навколо цілі)

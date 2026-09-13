@@ -1,5 +1,6 @@
 package com.example.examplemod.Enemy.EnemyBehavior.EnemyPursuit_N_Search.PursuitBehavior;
 
+import com.example.examplemod.Enemy.EnemyMovement.Run_N_Jump.Run_N_JumpUtils;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.Brain;
@@ -99,7 +100,7 @@ public class PursuitBrainBridgeGoal extends Goal {
             boolean isCharging = this.mob.isUsingItem();
             float speed = isCharging
                     ? CHARGING_SPEED_MODIFIER
-                    : (float) PursuitEnemyBehavior.getSprintSpeedModifier(this.mob);
+                    : (float) Run_N_JumpUtils.getRunSpeedModifier(this.mob);
             brain.setMemory(MemoryModuleType.WALK_TARGET,
                     new WalkTarget(chasePos, speed, WALK_TARGET_COMPLETION_RANGE));
             this.mob.getLookControl().setLookAt(

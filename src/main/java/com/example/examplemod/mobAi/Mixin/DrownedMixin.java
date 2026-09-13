@@ -43,7 +43,7 @@ public class DrownedMixin {
                         || goal.getGoal() instanceof MeleeAttackGoal
         );
 
-        drowned.goalSelector.addGoal(0, new PursuitEnemyBehavior(drowned, true, 1.0));
+        drowned.goalSelector.addGoal(0, new PursuitEnemyBehavior(drowned, true));
         drowned.goalSelector.addGoal(1, new BetterDrownedGoalAi(drowned, 1.0D, 40));
 
         // Melee-фолбек — ЛИШЕ коли дровнед НЕ тримає тризуб (BetterDrownedGoalAi.canUse() і так
